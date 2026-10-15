@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老师后台 · Pets Story</title>
+<style>
+:root{--bg:#f4f7fe;--primary:#4318ff;--accent:#ffb800;--text:#2b3674;--muted:#a3aed0;--border:#e9edf7;--soft:#f8f9fc;--ok:#05cd99}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,sans-serif}
+body{background:var(--bg);color:var(--text);padding:16px}
+.wrap{max-width:1100px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:#fff;padding:14px 20px;border-radius:16px;margin-bottom:16px}
+.brand{font-weight:bold;color:var(--primary)}
+.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,.03)}
+h2{font-size:1.05rem;margin-bottom:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.row label{font-size:.75rem;font-weight:700;display:flex;flex-direction:column;gap:4px}
+input{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:.9rem;width:140px}
+.b{background:var(--primary);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.8rem}
+.b.gold{background:var(--accent);color:#000}.b.ghost{background:var(--bg);color:var(--text)}.b.red{background:#fde8e8;color:#c22}
+button:focus-visible,input:focus{outline:3px solid var(--accent);outline-offset:1px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:640px}
+th,td{padding:10px 8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-size:.75rem}
+td.act{display:flex;gap:6px}
+.empty{color:var(--muted);padding:12px 0}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 18px;border-radius:10px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">👩‍🏫 老师后台 · <span id="me"></span></div>
+    <div class="row"><button class="b ghost" data-a="mypw">修改我的密码</button><button class="b" data-a="logout">退出</button></div>
+  </header>
+
+  <section class="card">
+    <h2>🎁 全班奖励</h2>
+    <div class="row">
+      <label>金币<input id="a-coins" type="number" value="0" min="0"></label>
+      <label>星星<input id="a-stars" type="number" value="0" min="0"></label>
+      <button class="b gold" data-a="awardAll">发放给全班</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>➕ 添加学生</h2>
+    <div class="row">
+      <label>学号（字母/数字）<input id="n-id" maxlength="20"></label>
+      <label>姓名<input id="n-name" maxlength="12"></label>
+      <label>初始密码<input id="n-pw" type="text" maxlength="30"></label>
+      <button class="b" data-a="add">添加</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>📋 学生列表（<span id="count">0</span> 人）</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>姓名 / 学号</th><th>宠物</th><th>金币</th><th>星星</th><th>今日打卡</th><th>操作</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <div id="empty" class="empty" hidden>还没有学生，请先在上方添加。</div>
+  </section>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="shared.js"></script>
+<script>
+const me = Auth.guard('teacher');
+if (!me) throw new Error('未登录');
+
+const $ = id => document.getElementById(id);
+const el = (t, p = {}, ...k) => { const n = Object.assign(document.createElement(t), p); n.append(...k); return n; };
+let tt; const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2200); };
+const students = () => Auth.users().filter(u => u.role === 'student');
+const today = () => new Date().toLocaleDateString('sv');
+const PETS = ['未孵化 🥚', 'Lv.1', 'Lv.2', 'Lv.3 👑'];
+
+// 在学生存档上加金币/星星（学生没有存档时，从初始值开始算）
+function award(id, c, s) {
+  const d = Auth.loadSave(id) || {};
+  d.coins = Math.max(0, (d.coins ?? Auth.START.coins) + c);
+  d.stars = Math.max(0, (d.stars ?? Auth.START.stars) + s);
+  Auth.writeSave(id, d);
+}
+const askNum = msg => { const n = parseInt(prompt(msg), 10); return Number.isFinite(n) ? n : null; };
+const btn = (text, a, id, cls = 'b') => { const b = el('button', { className: cls, textContent: text }); b.dataset.a = a; if (id) b.dataset.id = id; return b; };
+
+function render() {
+  const list = students(), body = $('rows'); body.replaceChildren();
+  $('count').textContent = list.length; $('empty').hidden = list.length > 0;
+  list.forEach(u => {
+    const d = Auth.loadSave(u.id) || {};
+    const done = d.date === today() ? (d.completed || []).length : 0;
+    body.append(el('tr', {},
+      el('td', { textContent: `${u.name}（${u.id}）` }),
+      el('td', { textContent: PETS[d.petLevel || 0] || '-' }),
+      el('td', { textContent: d.coins ?? Auth.START.coins }),
+      el('td', { textContent: d.stars ?? Auth.START.stars }),
+      el('td', { textContent: `${done} / 5` }),
+      el('td', { className: 'act' },
+        btn('+金币', 'coin', u.id, 'b gold'), btn('+星星', 'star', u.id, 'b gold'),
+        btn('重置密码', 'reset', u.id, 'b ghost'), btn('删除', 'del', u.id, 'b red'))));
+  });
+}
+
+const A = {
+  logout: Auth.logout,
+  coin(id) { const n = askNum('发放多少金币？（负数为扣除）'); if (n) { award(id, n, 0); render(); toast('已更新金币'); } },
+  star(id) { const n = askNum('发放多少星星？（负数为扣除）'); if (n) { award(id, 0, n); render(); toast('已更新星星'); } },
+  awardAll() {
+    const c = parseInt($('a-coins').value, 10) || 0, s = parseInt($('a-stars').value, 10) || 0, list = students();
+    if (!list.length || (!c && !s)) return toast('请先填写奖励数量');
+    list.forEach(u => award(u.id, c, s)); render(); toast(`已发放给 ${list.length} 位学生`);
+  },
+  async add() {
+    const id = $('n-id').value.trim(), name = $('n-name').value.trim(), pw = $('n-pw').value;
+    if (!/^[A-Za-z0-9_-]{2,20}$/.test(id)) return toast('学号只能是 2-20 位字母、数字、- 或 _');
+    if (!name) return toast('请填写姓名');
+    if (pw.length < 4) return toast('密码至少 4 位');
+    const all = Auth.users();
+    if (all.some(u => u.id === id)) return toast('这个学号已存在');
+    all.push({ id, name, role: 'student', pw: await Auth.hash(id, pw) });
+    Auth.saveUsers(all); ['n-id', 'n-name', 'n-pw'].forEach(i => $(i).value = ''); render(); toast(`已添加 ${name}`);
+  },
+  async reset(id) {
+    const pw = prompt('输入新密码（至少 4 位）');
+    if (pw === null) return;
+    if (pw.length < 4) return toast('密码至少 4 位');
+    const all = Auth.users(), u = all.find(x => x.id === id);
+    u.pw = await Auth.hash(id, pw); Auth.saveUsers(all); toast('密码已重置');
+  },
+  del(id) {
+    const u = Auth.users().find(x => x.id === id);
+    if (!confirm(`确定删除 ${u.name}（${id}）？该学生的所有游戏数据也会被删除，无法恢复。`)) return;
+    Auth.saveUsers(Auth.users().filter(x => x.id !== id)); localStorage.removeItem(Auth.saveKey(id)); render(); toast('已删除');
+  },
+  async mypw() {
+    const pw = prompt('输入新的老师密码（至少 6 位）');
+    if (pw === null) return;
+    if (pw.length < 6) return toast('老师密码至少 6 位');
+    const all = Auth.users(), u = all.find(x => x.id === me.id);
+    u.pw = await Auth.hash(u.id, pw); Auth.saveUsers(all); toast('密码已修改');
+  }
+};
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-a]');
+  if (t) A[t.dataset.a]?.(t.dataset.id);
+});
+window.addEventListener('storage', render);               // 学生在别的标签页打卡时，这里自动刷新
+
+$('me').textContent = me.name;
+Auth.ready.then(render);
+</script>
+</body>
+</html>

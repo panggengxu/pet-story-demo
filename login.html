@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · Pets Story</title>
+<style>
+:root{--bg:#f4f7fe;--primary:#4318ff;--accent:#ffb800;--text:#2b3674;--muted:#a3aed0;--border:#e9edf7;--soft:#f8f9fc}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,sans-serif}
+body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.box{background:#fff;border-radius:20px;padding:28px;width:min(380px,100%);box-shadow:0 8px 24px rgba(0,0,0,.06)}
+h1{font-size:1.4rem;color:var(--primary);text-align:center;margin-bottom:4px}
+.sub{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:20px}
+.roles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.role{border:2px solid var(--border);background:var(--soft);border-radius:12px;padding:10px;font-weight:700;cursor:pointer;color:var(--text);font-size:.95rem}
+.role[aria-checked=true]{border-color:var(--primary);background:#eeeaff;color:var(--primary)}
+label{display:block;font-size:.8rem;font-weight:700;margin:12px 0 4px}
+input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:1rem}
+input:focus,button:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.go{width:100%;margin-top:18px;background:var(--primary);color:#fff;border:none;border-radius:12px;padding:12px;font-size:1rem;font-weight:700;cursor:pointer}
+.go:disabled{opacity:.6;cursor:wait}
+#err{color:#d33;font-size:.85rem;min-height:1.2em;margin-top:10px;text-align:center}
+.demo{margin-top:16px;background:var(--soft);border-radius:10px;padding:10px;font-size:.78rem;color:var(--muted);line-height:1.6}
+</style>
+</head>
+<body>
+<main class="box">
+  <h1>🐾 Pets Story</h1>
+  <div class="sub">请选择身份并登录</div>
+  <form id="f" autocomplete="off">
+    <div class="roles" role="radiogroup" aria-label="身份">
+      <button type="button" class="role" role="radio" data-role="student" aria-checked="true">🎒 学生</button>
+      <button type="button" class="role" role="radio" data-role="teacher" aria-checked="false">👩‍🏫 老师</button>
+    </div>
+    <label for="uid">账号</label>
+    <input id="uid" required autocapitalize="off" placeholder="学生填学号，例如 s001">
+    <label for="pw">密码</label>
+    <input id="pw" type="password" required>
+    <div id="err" role="alert"></div>
+    <button class="go" id="go">登录</button>
+  </form>
+  <div class="demo">演示账号（上线前请删除这段提示）<br>老师：teacher / teacher123<br>学生：s001 / 1234，s002 / 1234</div>
+</main>
+<script src="shared.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const HOME = { student: 'index.html', teacher: 'teacher.html' };
+let role = 'student';
+
+const s = Auth.session();
+if (s) location.replace(HOME[s.role]);                    // 已登录就直接进入
+
+document.querySelectorAll('.role').forEach(b => b.onclick = () => {
+  role = b.dataset.role;
+  document.querySelectorAll('.role').forEach(x => x.setAttribute('aria-checked', x === b));
+  $('uid').placeholder = role === 'student' ? '学生填学号，例如 s001' : '老师账号';
+  $('err').textContent = '';
+});
+
+$('f').onsubmit = async e => {
+  e.preventDefault();
+  $('go').disabled = true; $('err').textContent = '';
+  try {
+    const u = await Auth.login($('uid').value, $('pw').value, role);
+    if (u) return location.href = HOME[u.role];
+    $('err').textContent = '账号或密码错误，或身份选择不对';
+  } catch {
+    $('err').textContent = '无法登录：请用 https、localhost 或直接打开本地文件';
+  }
+  $('go').disabled = false;
+};
+</script>
+</body>
+</html>
