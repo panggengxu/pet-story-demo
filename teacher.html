@@ -111,6 +111,12 @@ td.act{display:flex;gap:6px}
     </div>
     <textarea id="p-body" maxlength="200" aria-label="内容" placeholder="内容（可选）"></textarea>
     <label style="display:block;margin-top:8px;font-size:.85rem"><input id="p-proof" type="checkbox" checked style="width:auto"> 要求学生提交证明（照片或文字说明）</label>
+    <div style="margin-top:10px;font-size:.85rem;font-weight:700">发布到哪些班级（可多选，每个班各自独立收作业、批准）：</div>
+    <div id="p-classes" style="display:flex;gap:14px;flex-wrap:wrap;margin:6px 0"></div>
+    <div class="row" style="margin:4px 0 8px;align-items:center">
+      <button class="b ghost" data-a="pubAll">全选 / 取消全选所有班级</button>
+      <label style="flex-direction:row;align-items:center;gap:4px;font-weight:600;font-size:.85rem"><input id="p-imp" type="checkbox" style="width:auto"> ⭐ 重要（学生首页置顶并标红）</label>
+    </div>
     <div style="margin:8px 0 16px"><button class="b" data-a="publish">发布</button></div>
     <div id="notice-list"></div>
   </section>
@@ -155,6 +161,18 @@ function renderClassSelect() {
   sel.replaceChildren(...(cs.length ? cs.map(c => new Option(c.name, c.id)) : [new Option('（暂无班级）', '')]));
   sel.value = curClass;
 }
+let pubSel = null;                                         // 发布目标班级；null = 默认只发给当前班级
+function renderPubTargets() {
+  const box = $('p-classes'), cs = myClasses(); box.replaceChildren();
+  const sel = pubSel ? [...pubSel] : [curClass];
+  cs.forEach(c => {
+    const cb = el('input', { type: 'checkbox', className: 'chk', checked: sel.includes(c.id) });
+    cb.dataset.pc = c.id;
+    box.append(el('label', { style: 'display:flex;gap:4px;align-items:center;font-size:.88rem' }, cb, c.name));
+  });
+  if (!cs.length) box.append(el('span', { className: 'empty', textContent: '还没有可用的班级' }));
+}
+const curClassName = () => Auth.classes().find(c => c.id === curClass)?.name || '';
 function renderAdmin() {
   const card = $('admin-card'), u = myUser(); card.hidden = !u.admin;
   if (!u.admin) return;
@@ -221,7 +239,7 @@ function renderSum() {
 }
 
 // ===== 主题名单 =====
-const topicList = () => { const f = $('t-filter').value; return Auth.topics().filter(t => (!t.classId || t.classId === curClass) && (!f || t.subject === f)); };
+const topicList = () => { const f = $('t-filter').value; return Auth.topics().filter(t => t.classId === curClass && (!f || t.subject === f)); };
 function renderTopics() {
   const stu = students(), list = topicList(), tb = $('topic-table');
   tb.replaceChildren(); $('topic-sum').replaceChildren();
@@ -250,12 +268,13 @@ function renderTopicSum() {
 
 function renderNotices() {
   const box = $('notice-list'); box.replaceChildren();
-  const stu = students(), all = Auth.notices().filter(n => !n.classId || n.classId === curClass);
+  const stu = students(), all = Auth.notices().filter(n => n.classId === curClass);
+  box.append(el('div', { textContent: `「${curClassName()}」已发布的内容`, style: 'font-weight:700;margin:6px 0' }));
   if (!all.length) return box.append(el('div', { className: 'empty', textContent: '还没有发布过内容。' }));
   all.forEach(n => {
     const kids = [
       el('div', { style: 'display:flex;justify-content:space-between;gap:8px;align-items:center' },
-        el('b', { textContent: `${Auth.KIND[n.type] || '🎯 任务'}${n.subject ? '｜' + n.subject : ''}：${n.title}` }), btn('删除', 'delnotice', n.id, 'b red')),
+        el('b', { textContent: `${n.important ? '⭐重要 ' : ''}${Auth.KIND[n.type] || '🎯 任务'}${n.subject ? '｜' + n.subject : ''}：${n.title}` }), btn('删除', 'delnotice', n.id, 'b red')),
       el('div', { textContent: n.body || '（无内容）', style: 'margin:4px 0;color:var(--muted);font-size:.85rem' })
     ];
     if (n.type !== 'notice') {
@@ -283,7 +302,7 @@ function renderNotices() {
 }
 
 function render() {
-  renderClassSelect(); renderAdmin();
+  renderClassSelect(); renderAdmin(); renderPubTargets();
   renderNotices(); renderRoster(); renderTopics();
   const list = students(), body = $('rows'); body.replaceChildren();
   $('count').textContent = list.length; $('empty').hidden = list.length > 0;
@@ -373,19 +392,31 @@ const A = {
   },
   publish() {
     const type = $('p-type').value, task = type !== 'notice', title = $('p-title').value.trim();
+    const ids = [...document.querySelectorAll('[data-pc]:checked')].map(x => x.dataset.pc);
     if (!title) return toast('请填写标题');
-    if (!curClass) return toast('请先选择班级');
-    const n = Auth.notices();
-    n.unshift({ id: 'n' + Date.now(), classId: curClass, type, subject: $('p-subj').value, needProof: task && $('p-proof').checked, title, body: $('p-body').value.trim(),
+    if (!ids.length) return toast('请至少选择一个班级');
+    const n = Auth.notices(), t0 = Date.now();
+    ids.reverse().forEach((cid, i) => n.unshift({                 // 每个班一份独立的公告/任务
+      id: 'n' + (t0 + i), batch: 'b' + t0, important: $('p-imp').checked, classId: cid, type, subject: $('p-subj').value, needProof: task && $('p-proof').checked, title, body: $('p-body').value.trim(),
       coins: task ? Math.max(0, parseInt($('p-coins').value, 10) || 0) : 0,
-      stars: task ? Math.max(0, parseInt($('p-stars').value, 10) || 0) : 0, date: today(), subs: {} });
-    Auth.saveNotices(n); ['p-title', 'p-body'].forEach(i => $(i).value = ''); render(); toast('已发布');
+      stars: task ? Math.max(0, parseInt($('p-stars').value, 10) || 0) : 0, date: today(), subs: {} }));
+    Auth.saveNotices(n); ['p-title', 'p-body'].forEach(i => $(i).value = ''); $('p-imp').checked = false; render();
+    toast(`已发布给 ${ids.length} 个班级`);
+  },
+  pubAll() {                                               // 一键选中（或取消）所有可发布的班级
+    const boxes = [...document.querySelectorAll('[data-pc]')], all = boxes.every(b => b.checked);
+    boxes.forEach(b => b.checked = !all);
+    pubSel = new Set(boxes.filter(b => b.checked).map(b => b.dataset.pc));
   },
   delnotice(id) {
     if (!confirm('确定删除这一条？')) return;
-    const n = Auth.notices().find(x => x.id === id);
-    if (n) Object.keys(n.subs).forEach(sid => Auth.delProof(id, sid));
-    Auth.saveNotices(Auth.notices().filter(x => x.id !== id)); render();
+    const all = Auth.notices(), n = all.find(x => x.id === id);
+    if (!n) return;
+    const same = n.batch ? all.filter(x => x.batch === n.batch && x.id !== id) : [];   // 同一次发布的其他班
+    const both = same.length && confirm(`这条还同时发给了另外 ${same.length} 个班。\n点“确定”一起删除，点“取消”只删除本班这一条。`);
+    const gone = new Set([id, ...(both ? same.map(x => x.id) : [])]);
+    all.filter(x => gone.has(x.id)).forEach(x => Object.keys(x.subs).forEach(sid => Auth.delProof(x.id, sid)));
+    Auth.saveNotices(all.filter(x => !gone.has(x.id))); render();
   },
   approve(id) {                                            // id = 公告id|学号
     const [nid, sid] = id.split('|'), all = Auth.notices(), n = all.find(x => x.id === nid);
@@ -475,7 +506,11 @@ document.addEventListener('change', e => {                 // 勾选/取消勾�
   all[key] = [...set]; Auth.saveRecords(all); renderSum();
 });
 Auth.SUBJECTS.forEach(x => $('p-subj').append(new Option(x, x)));
-$('cls').onchange = () => { curClass = $('cls').value; render(); };
+$('cls').onchange = () => { curClass = $('cls').value; pubSel = null; render(); };
+document.addEventListener('change', e => {                 // 记住发布目标班级的勾选
+  if (!e.target.closest('[data-pc]')) return;
+  pubSel = new Set([...document.querySelectorAll('[data-pc]:checked')].map(x => x.dataset.pc));
+});
 document.addEventListener('change', e => {                 // 管理员勾选老师负责的班级
   const c = e.target.closest('[data-ac]');
   if (!c) return;
