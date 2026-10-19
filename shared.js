@@ -26,3 +26,31 @@ const Auth = (() => {
     const u = users().find(x => x.id === id.trim());
     if (!u || u.role !== role || u.pw !== await hash(u.id, pw)) return null;
     sessionStorage.setItem(SK, JSON.stringify({ id: u.id, name: u.name, role: u.role })); // 关闭浏览器即退出
+    return u;
+  }
+  const logout = () => { sessionStorage.removeItem(SK); location.href = 'login.html'; };
+  const guard = role => {                                   // 页面入口检查：身份不对就回登录页
+    const s = session();
+    if (!s || s.role !== role) { location.replace('login.html'); return null; }
+    return s;
+  };
+  const saveKey = id => 'petsStory.save.' + id;             // 每个学生独立存档
+  const loadSave = id => { try { return JSON.parse(localStorage.getItem(saveKey(id))); } catch { return null; } };
+  const writeSave = (id, o) => localStorage.setItem(saveKey(id), JSON.stringify(o));
+
+  // 公告与任务：{id,type:'notice'|'task',title,body,coins,stars,date,subs:{学号:'pending'|'done'}}
+  const NK = 'petsStory.notices.v1';
+  const notices = () => { try { return JSON.parse(localStorage.getItem(NK)) || []; } catch { return []; } };
+  const saveNotices = n => localStorage.setItem(NK, JSON.stringify(n));
+  const SUBJECTS = ['BC 华文', 'BM 马来文', 'BI 英文', 'MM 数学', 'SC 科学'];
+  const KIND = { notice: '📢 公告', task: '🎯 任务', homework: '📚 功课' };
+  // 提交记录统一成 {status:'pending'|'done'|'rejected', note, photo, time, reply}（兼容旧版字符串）
+  const sub = (n, id) => { const v = n.subs[id]; return typeof v === 'string' ? { status: v } : (v || null); };
+  // 证明照片单独存放，避免公告数据过大；容量不足时 setProof 会抛错
+  const PK = (nid, sid) => 'petsStory.proof.' + nid + '.' + sid;
+  const getProof = (nid, sid) => localStorage.getItem(PK(nid, sid));
+  const setProof = (nid, sid, url) => localStorage.setItem(PK(nid, sid), url);
+  const delProof = (nid, sid) => localStorage.removeItem(PK(nid, sid));
+
+  return { SUBJECTS, KIND, sub, getProof, setProof, delProof, NK, notices, saveNotices, START, hash, users, saveUsers, ready, session, login, logout, guard, saveKey, loadSave, writeSave };
+})();

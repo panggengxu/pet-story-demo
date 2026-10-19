@@ -27,3 +27,545 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .btn-action{background:var(--primary);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.8rem}
 .btn-action:disabled{background:var(--ok);cursor:default}
 .btn-gold{background:var(--accent);color:#000}.btn-block{width:100%}
+.btn-cheat{background:var(--accent);color:#000;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:.8rem}
+#pet-btn{margin-bottom:12px;padding:10px;font-size:.9rem}
+.pet-box{background:linear-gradient(135deg,#e0c3fc,#8ec5fc);height:180px;border-radius:14px;display:flex;justify-content:center;align-items:center;margin-bottom:12px;overflow:hidden}
+.pet-img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 4px 8px rgba(0,0,0,.15))}
+.rank-tag{font-size:.8rem;background:#eee;padding:2px 8px;border-radius:6px}
+.slots-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.gear-slot{background:var(--soft);border:1px dashed var(--muted);border-radius:8px;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.75rem;color:var(--muted);text-align:center;padding:2px}
+.gear-slot.equipped{border:1px solid var(--primary);background:var(--bg);color:var(--text);font-weight:bold}
+.unequip{background:none;border:none;color:#d33;cursor:pointer;font-size:.75rem;padding:6px 8px}
+.inv-item{border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;background:var(--soft);width:100px}
+.hint{font-size:.85rem;color:var(--muted)}
+.music-item,.rank-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);font-size:.9rem;gap:10px}
+.music-cat{font-weight:bold;font-size:.95rem;color:var(--primary);margin:16px 0 8px;border-bottom:2px solid var(--border);padding-bottom:4px}
+.msg-item{background:var(--soft);padding:8px;border-radius:8px;margin-bottom:6px;overflow-wrap:anywhere}
+#msg-input{width:100%;height:70px;padding:8px;border:1px solid var(--border);border-radius:8px;resize:none;margin-bottom:8px}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;justify-content:center;align-items:center}
+.modal-overlay.open{display:flex}
+.modal-box{background:#fff;padding:25px;border-radius:20px;text-align:center;width:min(350px,90vw);max-height:80vh;overflow-y:auto;box-shadow:0 10px 25px rgba(0,0,0,.2)}
+.pool-item{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--border);font-size:.85rem;text-align:left}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 18px;border-radius:10px;font-size:.9rem;z-index:1000;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}
+.bar{height:10px;background:var(--border);border-radius:6px;overflow:hidden;margin:6px 0}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,#ff9a9e,#fad0c4);transition:width .3s}
+.pet-act{display:flex;gap:6px}.pet-act .btn-action{flex:1}
+.power{font-weight:700;color:var(--primary)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="brand">🐾 Pets Story Pro · <span id="me-name"></span> <button class="tab-btn" data-action="logout">退出</button></div>
+    <div class="tabs" role="tablist">
+      <button class="tab-btn" role="tab" data-action="tab" data-id="home" aria-selected="true">🏠 首页</button>
+      <button class="tab-btn" role="tab" data-action="tab" data-id="shop" aria-selected="false">🛒 宠物商店与抽奖</button>
+      <button class="tab-btn" role="tab" data-action="tab" data-id="music" aria-selected="false">🎵 音乐盒</button>
+      <button class="tab-btn" role="tab" data-action="tab" data-id="social" aria-selected="false">💬 留言与好友</button>
+    </div>
+  </header>
+
+  <div id="tab-home" class="section-view active" role="tabpanel">
+    <div class="grid-2">
+      <div>
+        <div class="card">
+          <div class="card-title">MY COMPANION STATS</div>
+          <div class="card-heading">学习能量 ⚡</div>
+          <div class="stat-row">
+            <div class="stat">🪙 金币: <strong id="coins">0</strong></div>
+            <div class="stat">⭐ 星星: <strong id="stars">0</strong></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">NOTICE BOARD</div>
+          <div class="card-heading">老师的公告与任务 📢</div>
+          <div id="notice-box"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">TODAY'S MISSION</div>
+          <div class="card-heading">五科学习打卡 🎯</div>
+          <div id="subjects-container"></div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-title">MY COMPANION & GEARS</div>
+          <div class="card-heading"><span id="pet-name"></span><span id="pet-rank-text" class="rank-tag"></span></div>
+          <div class="pet-box"><img id="pet-img" class="pet-img" alt="我的宠物"></div>
+          <button id="pet-btn" class="btn-action btn-block"></button>
+          <div id="pet-care" hidden>
+            <div style="display:flex;justify-content:space-between;font-size:.85rem"><span>心情 <span id="mood-face"></span></span><span class="power">⚔️ 战力 <span id="power"></span></span></div>
+            <div class="bar" role="progressbar" aria-label="心情"><i id="mood-bar"></i></div>
+            <div class="hint" style="margin-bottom:8px">💗 亲密度 <span id="bond"></span>（每 10 点 +1 战力）</div>
+            <div class="pet-act">
+              <button id="btn-feed" class="btn-action" data-action="feed"></button>
+              <button id="btn-play" class="btn-action" data-action="play"></button>
+              <button id="btn-pat" class="btn-action" data-action="pat"></button>
+            </div>
+            <div id="pet-say" class="hint" style="margin:8px 0 12px;min-height:1.2em"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:.85rem;font-weight:bold">六格装备栏（点击“卸下”可取下）</span>
+            <button class="btn-action" data-action="tab" data-id="shop">去背包穿戴 🎒</button>
+          </div>
+          <div class="slots-grid" id="equipment-slots"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-shop" class="section-view" role="tabpanel">
+    <div class="card">
+      <div class="card-title">PET SHOP & GACHA</div>
+      <div class="card-heading">神秘宠物盲盒与奖励预览 🎁</div>
+      <div style="border:1px solid var(--border);border-radius:12px;padding:15px;text-align:center;background:var(--soft);max-width:340px;margin-bottom:20px">
+        <div style="font-size:2.5rem">🎁</div>
+        <div style="font-weight:bold;margin:6px 0">神秘宠物盲盒</div>
+        <div class="hint" style="margin-bottom:10px">每次抽取消耗 <span id="gacha-cost"></span>🪙</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-action btn-gold" style="flex:1" data-action="preview">预览奖池 👀</button>
+          <button class="btn-action" style="flex:1" data-action="gacha">抽奖</button>
+        </div>
+      </div>
+      <div class="card-title">MY INVENTORY（我的背包）</div>
+      <div class="hint" style="margin-bottom:10px">点击装备下方的“穿戴”，即可装到宠物身上。带 🔁 的是重复装备，可以分解换金币。</div>
+      <button class="btn-action btn-gold" data-action="sellDup" style="margin-bottom:10px">♻️ 一键分解重复装备</button>
+      <div id="inventory-container" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+    </div>
+  </div>
+
+  <div id="tab-music" class="section-view" role="tabpanel">
+    <div class="card">
+      <div class="card-title">MUSIC BOX</div>
+      <div class="card-heading">主题曲音乐盒 🎵（支持 30 秒试听）</div>
+      <div id="music-container"></div>
+      <audio id="bgm-player" controls style="width:100%;margin-top:16px" hidden></audio>
+    </div>
+  </div>
+
+  <div id="tab-social" class="section-view" role="tabpanel">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">MESSAGE WALL</div>
+        <div class="card-heading">留言墙与鼓励 💬</div>
+        <textarea id="msg-input" maxlength="200" aria-label="留言内容" placeholder="写下你的学习心得，或给同学的鼓励..."></textarea>
+        <button class="btn-action" data-action="post">发布留言</button>
+        <div id="msg-list" style="margin-top:12px;font-size:.85rem"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">FRIENDS</div>
+        <div class="card-heading">好友排行榜与送礼 🎁</div>
+        <div id="rank-list"></div>
+        <div class="hint" style="margin-top:8px">排行榜中的同学为演示数据（真实好友需要后端），送礼暂无实际效果。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="preview-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="盲盒奖池预览">
+  <div class="modal-box">
+    <h3 style="margin-bottom:12px;color:var(--primary)">🎁 盲盒奖池预览</h3>
+    <div class="hint" style="margin-bottom:10px">所有可能抽到的奖励和概率：</div>
+    <div id="preview-list"></div>
+    <button class="btn-action btn-block" style="margin-top:15px" data-action="close">关闭预览</button>
+  </div>
+</div>
+
+<div id="gacha-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="抽奖结果">
+  <div class="modal-box">
+    <div class="hint" style="font-weight:bold">MYSTERY BOX OPENED</div>
+    <h3 style="margin-top:5px">🎉 恭喜抽中！</h3>
+    <div id="gacha-reward-icon" style="font-size:4rem;margin:15px 0"></div>
+    <div id="gacha-reward-name" style="font-weight:bold;font-size:1.1rem;margin-bottom:15px;color:var(--primary)"></div>
+    <button class="btn-action btn-block" data-action="close">收入背包 🎒</button>
+  </div>
+</div>
+<div id="proof-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="提交完成证明">
+  <div class="modal-box" style="text-align:left">
+    <h3 id="proof-title" style="margin-bottom:4px;color:var(--primary)"></h3>
+    <div id="proof-need" class="hint" style="margin-bottom:10px"></div>
+    <label for="proof-note" style="font-size:.8rem;font-weight:700">文字说明</label>
+    <textarea id="proof-note" maxlength="200" placeholder="例如：完成了练习册第 12–13 页" style="width:100%;height:70px;padding:8px;border:1px solid var(--border);border-radius:8px;resize:none;margin:4px 0 10px"></textarea>
+    <label for="proof-file" style="font-size:.8rem;font-weight:700">拍照上传（作业/成果照片）</label>
+    <input id="proof-file" type="file" accept="image/*" style="width:100%;margin:4px 0">
+    <img id="proof-img" alt="照片预览" hidden style="max-width:100%;border-radius:8px;margin:6px 0">
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn-action btn-block" data-action="sendProof">提交给老师</button>
+      <button class="btn-action btn-gold" data-action="close">取消</button>
+    </div>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="shared.js"></script>
+
+<script>
+// ===== 配置（改图片/音频路径、价格、奖池都在这里）=====
+const me = Auth.guard('student');            // 未登录或身份不对，会跳回 login.html
+if (!me) throw new Error('未登录');
+const SAVE_KEY = Auth.saveKey(me.id);        // 每个学生独立存档
+const HATCH_COST = 50, GACHA_COST = 30, PREVIEW_SECONDS = 30;
+const FALLBACK_IMG = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80';
+const SLOTS = ['武器', '防具', '饰品', '宝物', '翅膀', '核心'];
+const SUBS = ['BC 华文', 'BM 马来文', 'BI 英文', 'MM 数学', 'SC 科学'];
+// 宠物形态：等级 = 数组下标；needStars 为进化所需的累计星星数（不扣除）
+const PET_STAGES = [
+  { name: '神秘宠物蛋', img: 'pet/Egg.jpg',            label: '等待孵化 🥚' },
+  { name: 'AI 幻兽伙伴', img: 'pet/Ender dragon 1.jpg', label: 'Lv.1 初阶萌态' },
+  { name: 'AI 幻兽伙伴', img: 'pet/Ender dragon 2.jpg', label: 'Lv.2 觉醒高阶形态 ✨', needStars: 15 },
+  { name: 'AI 幻兽伙伴', img: 'pet/Ender dragon 3.jpg', label: 'Lv.3 终极神兽形态 👑', needStars: 30 }
+];
+const MUSIC = [
+  { cat: '⚔️ 进击的巨人 (Attack on Titan)', songs: [
+    { id: 101, title: 'Ashes on The Fire (主旋律)', price: 280, file: 'audio/AOT/Ashes on The Fire.mp3' },
+    { id: 102, title: 'Dark Side Of The Moon (兵长角色曲)', price: 280, file: 'audio/AOT/Dark Side Of The Moon.mp3' } ] },
+  { cat: '⚡ 宝可梦大冒险 (Pokémon)', songs: [
+    { id: 201, title: '真新镇背景音乐 (Town)', price: 280, file: 'audio/Pokemon/Pokemon Littleroot Town.mp3' },
+    { id: 202, title: '激烈的宝可梦战斗！(Battle)', price: 280, file: 'audio/Pokemon/Pokemon Battle.mp3' } ] }
+];
+const SONGS = MUSIC.flatMap(c => c.songs);
+const POOL = [
+  { name: '勇气之剑',   type: '武器', icon: '⚔️', rarity: '稀有', weight: 25, power: 20 },
+  { name: '守护之盾',   type: '防具', icon: '🛡️', rarity: '稀有', weight: 20, power: 18 },
+  { name: '幸运吊坠',   type: '饰品', icon: '📿', rarity: '稀有', weight: 20, power: 15 },
+  { name: '远古宝珠',   type: '宝物', icon: '🔮', rarity: '史诗', weight: 12, power: 35 },
+  { name: '疾风之翼',   type: '翅膀', icon: '🕊️', rarity: '史诗', weight: 15, power: 32 },
+  { name: '传说神兽核心', type: '核心', icon: '⚡', rarity: '传说', weight: 8,  power: 60 }
+];
+// 战力 = 宠物形态基础值 + 装备加成 + 亲密度/10；心情过低(<15)时 -10%
+// 分解重复装备获得的金币（期望值低于抽奖成本，避免刷金币）
+const SELL = { 稀有: 10, 史诗: 25, 传说: 60 };
+const PET_BASE = [0, 50, 120, 250];
+const NPC = [{ name: '同学 A', power: 260 }, { name: '同学 B', power: 180 }, { name: '同学 C', power: 90 }]; // 演示用
+// 互动：每日次数上限、对话
+const LIMITS = { feed: 3, play: 3, pat: 5 };
+const SAYS = {
+  feed: ['好好吃！谢谢你～', '肚子饱饱，超满足！'],
+  play: ['再来一次！', '今天玩得好开心！'],
+  pat:  ['嘿嘿，好舒服～', '最喜欢你了！']
+};
+
+// ===== 状态与存档 =====
+const today = () => new Date().toLocaleDateString('sv'); // 本地日期 YYYY-MM-DD
+const state = {
+  coins: 500, stars: 10, completed: [], date: today(), unlockedMusic: [], inventory: [],
+  equipped: Object.fromEntries(SLOTS.map(s => [s, null])), petLevel: 0, messages: [],
+  pet: { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0 }
+};
+function load() {
+  try { Object.assign(state, JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); } catch {}
+  if (!PET_STAGES[state.petLevel]) state.petLevel = 0;
+  if (state.date !== today()) { state.completed = []; state.date = today(); } // 每日重置打卡
+  const p = state.pet = { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0, ...state.pet };
+  const h = Math.floor((Date.now() - p.tick) / 36e5);   // 每过 1 小时，心情 -3
+  p.mood = Math.max(0, p.mood - h * 3); p.tick += h * 36e5;
+  if (p.day !== today()) { p.day = today(); p.feed = p.play = p.pat = 0; }
+}
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch {} }
+
+// ===== 工具 =====
+const $ = id => document.getElementById(id);
+let toastTimer;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+function el(tag, props = {}, ...kids) {
+  const n = Object.assign(document.createElement(tag), props);
+  n.append(...kids); return n;
+}
+function btn(text, action, data = {}, cls = 'btn-action', extra = {}) {
+  const b = el('button', { className: cls, textContent: text, ...extra });
+  b.dataset.action = action; Object.assign(b.dataset, data); return b;
+}
+const openModal = id => $(id).classList.add('open');
+const closeModals = () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+
+// ===== 渲染 =====
+function render() {
+  $('coins').textContent = state.coins;
+  $('stars').textContent = state.stars;
+  renderPet(); renderCare(); renderRank(); renderNotices(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
+  save();
+}
+const gearPower = it => it ? (POOL.find(p => p.name === it.name)?.power ?? 0) : 0;
+function calcPower() {
+  if (state.petLevel < 1) return 0;
+  const raw = PET_BASE[state.petLevel] + SLOTS.reduce((n, k) => n + gearPower(state.equipped[k]), 0);
+  return Math.round(raw * (state.pet.mood < 15 ? 0.9 : 1)) + Math.floor(state.pet.bond / 10);
+}
+function renderCare() {
+  const p = state.pet, on = state.petLevel > 0;
+  $('pet-care').hidden = !on; if (!on) return;
+  $('power').textContent = calcPower(); $('bond').textContent = p.bond;
+  $('mood-bar').style.width = p.mood + '%';
+  $('mood-face').textContent = p.mood >= 70 ? '😄 开心' : p.mood >= 40 ? '🙂 还不错' : p.mood >= 15 ? '😐 有点无聊' : '😢 没精神（战力 -10%）';
+  [['feed', '🍖 喂食 (-5🪙)'], ['play', '🎾 陪玩'], ['pat', '🤗 摸摸']].forEach(([k, t]) => {
+    const b = $('btn-' + k); b.textContent = `${t} ${p[k]}/${LIMITS[k]}`; b.disabled = p[k] >= LIMITS[k];
+  });
+}
+function renderRank() {
+  const rows = [...NPC, { name: me.name + '（我）', power: calcPower(), me: true }].sort((a, b) => b.power - a.power);
+  $('rank-list').replaceChildren(...rows.map((r, i) => el('div', { className: 'rank-item', style: r.me ? 'background:#eeeaff;border-radius:8px' : '' },
+    el('span', { textContent: `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name}（战力: ${r.power}）` }),
+    r.me ? '' : btn('送礼物', 'gift'))));
+}
+function renderPet() {
+  const stage = PET_STAGES[state.petLevel], img = $('pet-img');
+  $('pet-name').textContent = stage.name;
+  $('pet-rank-text').textContent = stage.label;
+  if (img.dataset.src !== stage.img) {            // 仅在图片变化时才赋值，避免重复请求
+    img.dataset.src = stage.img;
+    img.onerror = () => { img.onerror = null; img.src = FALLBACK_IMG; };
+    img.src = stage.img;
+  }
+  const b = $('pet-btn'), next = PET_STAGES[state.petLevel + 1];
+  b.disabled = !next && state.petLevel > 0;
+  if (state.petLevel === 0) {
+    b.dataset.action = 'hatch'; b.textContent = `🥚 消耗 ${HATCH_COST} 金币孵化神秘宠物蛋！`;
+    b.style.background = 'linear-gradient(135deg,#ffb800,#ff4d4d)';
+  } else {
+    b.dataset.action = 'evolve';
+    b.textContent = next ? `✨ 进化宠物（需累计 ${next.needStars} 颗星星）` : '👑 已达最高形态';
+    b.style.background = next ? 'linear-gradient(135deg,#4318ff,#68e1fd)' : '';
+  }
+}
+const equippedNames = () => SLOTS.map(k => state.equipped[k]?.name).filter(Boolean);
+const owned = name => state.inventory.some(x => x.name === name) || equippedNames().includes(name);
+const isDup = (it, i) => state.inventory.some((x, j) => j !== i && x.name === it.name) || equippedNames().includes(it.name);
+
+function renderNotices() {
+  const box = $('notice-box'), all = Auth.notices().slice(0, 6); box.replaceChildren();
+  if (!all.length) return box.append(el('div', { className: 'hint', textContent: '老师还没有发布公告。' }));
+  all.forEach(n => {
+    const sb = Auth.sub(n, me.id), st = sb?.status;
+    const kids = [el('div', { textContent: `${Auth.KIND[n.type] || '🎯 任务'}${n.subject ? '｜' + n.subject : ''}　${n.title}`, style: 'font-weight:700;font-size:.9rem' })];
+    if (n.body) kids.push(el('div', { className: 'hint', textContent: n.body, style: 'margin:2px 0' }));
+    if (n.type !== 'notice') {
+      if (st === 'rejected') kids.push(el('div', { textContent: `❌ 老师退回：${sb.reply || '请重新提交'}`, style: 'color:#d33;font-size:.82rem;margin-top:4px' }));
+      kids.push(el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px' },
+        el('span', { className: 'hint', textContent: `奖励：${n.coins}🪙 ${n.stars}⭐` }),
+        st === 'done' ? el('span', { textContent: '✅ 已完成', style: 'color:var(--ok);font-weight:700;font-size:.85rem' })
+          : btn(st === 'pending' ? '⏳ 等待批准' : st === 'rejected' ? '重新提交' : '提交完成', 'submitTask', { id: n.id }, 'btn-action', { disabled: st === 'pending' })));
+    }
+    box.append(el('div', { className: 'subject-item', style: 'display:block' }, ...kids));
+  });
+}
+
+// 照片压缩：最长边 720px、JPEG 60%，一张约 50–100KB，避免撑爆浏览器存储
+function shrink(file, max = 720) {
+  return new Promise((ok, no) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); ok(c.toDataURL('image/jpeg', 0.6));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); no(new Error('bad image')); };
+    img.src = url;
+  });
+}
+let proofFor = null, proofData = null;
+
+function renderSubs() {
+  const box = $('subjects-container'); box.replaceChildren();
+  SUBS.forEach(sub => {
+    const done = state.completed.includes(sub);
+    box.append(el('div', { className: 'subject-item' + (done ? ' done' : '') },
+      el('span', { textContent: sub, style: 'font-weight:600;font-size:.9rem' }),
+      btn(done ? '已完成 ✓' : '打卡 +10🪙', 'checkin', { id: sub }, 'btn-action', { disabled: done })));
+  });
+}
+function renderSlots() {
+  const box = $('equipment-slots'); box.replaceChildren();
+  SLOTS.forEach(slot => {
+    const it = state.equipped[slot];
+    box.append(it
+      ? el('div', { className: 'gear-slot equipped' }, el('span', { textContent: `${it.icon} ${it.name} +${gearPower(it)}` }), btn('卸下', 'unequip', { id: slot }, 'unequip'))
+      : el('div', { className: 'gear-slot', textContent: `${slot}槽` }));
+  });
+}
+function renderInventory() {
+  const box = $('inventory-container'); box.replaceChildren();
+  if (!state.inventory.length) {
+    box.append(el('div', { className: 'hint', textContent: '背包空空如也，快去抽盲盒获取装备吧！' })); return;
+  }
+  state.inventory.forEach((it, i) => box.append(el('div', { className: 'inv-item' },
+    el('div', { textContent: it.icon, style: 'font-size:1.8rem' }),
+    el('div', { textContent: `${isDup(it, i) ? '🔁 ' : ''}${it.name} ⚔️+${gearPower(it)}`, style: 'font-size:.75rem;font-weight:bold;margin:4px 0' }),
+    btn('穿戴', 'equip', { id: i }, 'btn-action btn-block'),
+    btn(`分解 +${SELL[it.rarity]}🪙`, 'sell', { id: i }, 'btn-action btn-gold btn-block', { style: 'margin-top:6px' }))));
+}
+function renderMusic() {
+  const box = $('music-container'); box.replaceChildren();
+  MUSIC.forEach(c => {
+    box.append(el('div', { className: 'music-cat', textContent: c.cat }));
+    c.songs.forEach(s => {
+      const unlocked = state.unlockedMusic.includes(s.id);
+      box.append(el('div', { className: 'music-item' },
+        el('span', { textContent: `🎶 ${s.title}`, style: 'font-size:.85rem' }),
+        el('div', { style: 'display:flex;gap:6px' },
+          btn(`试听 ${PREVIEW_SECONDS} 秒`, 'previewSong', { id: s.id }, 'btn-action btn-gold'),
+          btn(unlocked ? '播放完整版 🎵' : `解锁 ${s.price}🪙`, 'unlockSong', { id: s.id }))));
+    });
+  });
+}
+function renderMessages() {
+  const box = $('msg-list'); box.replaceChildren();
+  state.messages.forEach(m => box.append(el('div', { className: 'msg-item' }, el('b', { textContent: '我: ' }), m))); // 纯文本，防 XSS
+}
+
+// ===== 行为 =====
+function care(k, mood, bond, cost) {
+  const p = state.pet;
+  if (p[k] >= LIMITS[k]) return toast('今天已经够啦，明天再来吧');
+  if (state.coins < cost) return toast(`❌ 金币不足，需要 ${cost} 金币`);
+  state.coins -= cost; p[k]++; p.mood = Math.min(100, p.mood + mood); p.bond += bond; render();
+  $('pet-say').textContent = '🐾 ' + SAYS[k][Math.floor(Math.random() * SAYS[k].length)];
+}
+const ACTIONS = {
+  tab({ id }) {
+    document.querySelectorAll('.section-view').forEach(v => v.classList.toggle('active', v.id === 'tab-' + id));
+    document.querySelectorAll('.tab-btn').forEach(b => b.setAttribute('aria-selected', b.dataset.id === id));
+  },
+  cheat() { state.coins += 500; render(); toast('🪙 已增加 500 金币（调试）'); },
+  checkin({ id }) {
+    if (state.completed.includes(id)) return;
+    state.completed.push(id); state.coins += 10; state.stars += 1; render();
+  },
+  hatch() {
+    if (state.coins < HATCH_COST) return toast(`❌ 金币不足，孵化需要 ${HATCH_COST} 金币`);
+    state.coins -= HATCH_COST; state.petLevel = 1; state.pet.mood = 70; state.pet.tick = Date.now(); render(); toast('🎉 咔嚓！宠物蛋破壳，你的专属宠物诞生啦！');
+  },
+  evolve() {
+    const next = PET_STAGES[state.petLevel + 1];
+    if (!next) return toast('👑 宠物已是最高形态');
+    if (state.stars < next.needStars) return toast(`❌ 星星不足：当前 ${state.stars} 颗，需要 ${next.needStars} 颗`);
+    state.petLevel++; render(); toast(`🌟 进化成功：${next.label}`);
+  },
+  equip({ id }) {
+    const it = state.inventory.splice(+id, 1)[0];
+    if (!it) return;
+    const old = state.equipped[it.type];
+    if (old) state.inventory.push(old);
+    state.equipped[it.type] = it; render(); toast(`✨ 已将【${it.name}】穿戴到${it.type}槽`);
+  },
+  unequip({ id }) {
+    const it = state.equipped[id];
+    if (!it) return;
+    state.inventory.push(it); state.equipped[id] = null; render();
+  },
+  preview() {
+    const total = POOL.reduce((s, i) => s + i.weight, 0), list = $('preview-list');
+    list.replaceChildren(...POOL.map(i => el('div', { className: 'pool-item' },
+      el('span', { textContent: `${i.icon} ${i.name}（${i.type}·${i.rarity}·战力+${i.power}）` }),
+      el('span', { textContent: `${Math.round(i.weight / total * 100)}%`, style: 'color:var(--primary);font-weight:bold' }))));
+    openModal('preview-modal');
+  },
+  gacha() {
+    if (state.coins < GACHA_COST) return toast(`❌ 金币不足，需要 ${GACHA_COST} 金币`);
+    state.coins -= GACHA_COST;
+    let r = Math.random() * POOL.reduce((s, i) => s + i.weight, 0);
+    const reward = POOL.find(i => (r -= i.weight) < 0) || POOL[0];
+    const dup = owned(reward.name);
+    state.inventory.push({ ...reward }); render();
+    $('gacha-reward-icon').textContent = reward.icon;
+    $('gacha-reward-name').textContent = `${reward.rarity} · ${reward.name}（战力 +${reward.power}）` + (dup ? ` 🔁 重复！可分解换 ${SELL[reward.rarity]}🪙` : '');
+    openModal('gacha-modal');
+  },
+  close: closeModals,
+  previewSong({ id }) { playSong(SONGS.find(s => s.id == id), true); toast(`🎧 开始 ${PREVIEW_SECONDS} 秒免费试听`); },
+  unlockSong({ id }) {
+    const s = SONGS.find(s => s.id == id);
+    if (!state.unlockedMusic.includes(s.id)) {
+      if (state.coins < s.price) return toast(`❌ 金币不足，需要 ${s.price} 金币`);
+      state.coins -= s.price; state.unlockedMusic.push(s.id); render(); toast('🎉 解锁成功，开始播放完整版');
+    }
+    playSong(s, false);
+  },
+  post() {
+    const input = $('msg-input'), text = input.value.trim();
+    if (!text) return toast('请先写点内容再发布');
+    state.messages.unshift(text); state.messages.length = Math.min(state.messages.length, 50);
+    input.value = ''; renderMessages(); save();
+  },
+  sell({ id }) {
+    const i = +id, it = state.inventory[i];
+    if (!it) return;
+    if (!isDup(it, i) && !confirm(`【${it.name}】是你唯一的一件，确定分解吗？`)) return;
+    state.inventory.splice(i, 1); state.coins += SELL[it.rarity]; render();
+    toast(`♻️ 分解【${it.name}】，获得 ${SELL[it.rarity]} 金币`);
+  },
+  sellDup() {                                              // 每种装备保留一件（已穿戴的也算一件）
+    const seen = new Set(equippedNames()), keep = [];
+    let n = 0, gold = 0;
+    state.inventory.forEach(it => { if (seen.has(it.name)) { n++; gold += SELL[it.rarity]; } else { seen.add(it.name); keep.push(it); } });
+    if (!n) return toast('没有重复装备');
+    state.inventory = keep; state.coins += gold; render(); toast(`♻️ 分解了 ${n} 件，获得 ${gold} 金币`);
+  },
+  submitTask({ id }) {                                     // 打开“提交证明”窗口
+    const n = Auth.notices().find(x => x.id === id);
+    if (!n) return;
+    proofFor = id; proofData = null;
+    $('proof-title').textContent = `${Auth.KIND[n.type] || '🎯 任务'} ${n.title}`;
+    $('proof-need').textContent = n.needProof ? '老师要求：请至少提交文字说明或照片' : '文字说明和照片都是选填';
+    $('proof-note').value = ''; $('proof-file').value = ''; $('proof-img').hidden = true;
+    openModal('proof-modal');
+  },
+  sendProof() {
+    const all = Auth.notices(), n = all.find(x => x.id === proofFor), note = $('proof-note').value.trim();
+    if (!n) return closeModals();
+    const cur = Auth.sub(n, me.id);
+    if (cur && cur.status !== 'rejected') return closeModals();
+    if (n.needProof && !note && !proofData) return toast('请先写说明或上传照片');
+    try { proofData ? Auth.setProof(n.id, me.id, proofData) : Auth.delProof(n.id, me.id); }
+    catch { return toast('⚠️ 存储空间不足，照片没能保存，请换小一点的图片或只写文字'); }
+    n.subs[me.id] = { status: 'pending', note, photo: !!proofData, time: Date.now() };
+    Auth.saveNotices(all); closeModals(); render(); toast('已提交，等老师批准后发放奖励');
+  },
+  feed() { care('feed', 25, 1, 5); },
+  play() { care('play', 15, 3, 0); },
+  pat() { care('pat', 5, 1, 0); },
+  gift() { toast('🎁 送礼功能演示中'); },
+  logout() { Auth.logout(); }
+};
+
+// ===== 音乐：试听限制在 PREVIEW_SECONDS 内 =====
+const player = $('bgm-player');
+let previewing = false;
+function playSong(song, preview) {
+  previewing = preview;
+  player.src = song.file; player.hidden = false;
+  player.play().catch(() => toast('⚠️ 音频无法播放，请检查文件路径'));
+}
+player.addEventListener('timeupdate', () => {
+  if (previewing && player.currentTime >= PREVIEW_SECONDS) {
+    player.pause(); player.currentTime = 0; previewing = false;
+    toast('⏱️ 试听结束，喜欢的话请用金币解锁完整版');
+  }
+});
+
+// ===== 事件委托与初始化 =====
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-action]');
+  if (t && !t.disabled) ACTIONS[t.dataset.action]?.(t.dataset);
+  else if (e.target.classList.contains('modal-overlay')) closeModals();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(); });
+
+$('gacha-cost').textContent = GACHA_COST;
+$('me-name').textContent = me.name;
+$('proof-file').addEventListener('change', async e => {
+  const f = e.target.files[0]; proofData = null; $('proof-img').hidden = true;
+  if (!f) return;
+  try { proofData = await shrink(f); $('proof-img').src = proofData; $('proof-img').hidden = false; }
+  catch { toast('⚠️ 这张图片无法读取，请换一张'); e.target.value = ''; }
+});
+// 老师发放奖励后，学生页面自动更新
+window.addEventListener('storage', e => { if (e.key === SAVE_KEY || e.key === Auth.NK) { load(); render(); renderMessages(); } });
+load(); render(); renderMessages();
+</script>
+</body>
+</html>

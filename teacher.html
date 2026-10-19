@@ -26,3 +26,216 @@ button:focus-visible,input:focus{outline:3px solid var(--accent);outline-offset:
 table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:640px}
 th,td{padding:10px 8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
 th{color:var(--muted);font-size:.75rem}
+td.act{display:flex;gap:6px}
+.empty{color:var(--muted);padding:12px 0}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 18px;border-radius:10px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">👩‍🏫 老师后台 · <span id="me"></span></div>
+    <div class="row"><button class="b ghost" data-a="mypw">修改我的密码</button><button class="b" data-a="logout">退出</button></div>
+  </header>
+
+  <section class="card">
+    <h2>🎁 全班奖励</h2>
+    <div class="row">
+      <label>金币<input id="a-coins" type="number" value="0" min="0"></label>
+      <label>星星<input id="a-stars" type="number" value="0" min="0"></label>
+      <button class="b gold" data-a="awardAll">发放给全班</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>📢 发布公告 / 任务</h2>
+    <div class="row">
+      <label>类型<select id="p-type"><option value="notice">公告</option><option value="homework">功课（可发奖励）</option><option value="task">任务（可发奖励）</option></select></label>
+      <label>科目<select id="p-subj"><option value="">不限科目</option></select></label>
+      <label>标题<input id="p-title" maxlength="40" style="width:220px"></label>
+      <label>奖励金币（仅任务）<input id="p-coins" type="number" value="20" min="0"></label>
+      <label>奖励星星（仅任务）<input id="p-stars" type="number" value="1" min="0"></label>
+    </div>
+    <textarea id="p-body" maxlength="200" aria-label="内容" placeholder="内容（可选）"></textarea>
+    <label style="display:block;margin-top:8px;font-size:.85rem"><input id="p-proof" type="checkbox" checked style="width:auto"> 要求学生提交证明（照片或文字说明）</label>
+    <div style="margin:8px 0 16px"><button class="b" data-a="publish">发布</button></div>
+    <div id="notice-list"></div>
+  </section>
+
+  <section class="card">
+    <h2>➕ 添加学生</h2>
+    <div class="row">
+      <label>学号（字母/数字）<input id="n-id" maxlength="20"></label>
+      <label>姓名<input id="n-name" maxlength="12"></label>
+      <label>初始密码<input id="n-pw" type="text" maxlength="30"></label>
+      <button class="b" data-a="add">添加</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>📋 学生列表（<span id="count">0</span> 人）</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>姓名 / 学号</th><th>宠物</th><th>金币</th><th>星星</th><th>今日打卡</th><th>操作</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <div id="empty" class="empty" hidden>还没有学生，请先在上方添加。</div>
+  </section>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="shared.js"></script>
+<script>
+const me = Auth.guard('teacher');
+if (!me) throw new Error('未登录');
+
+const $ = id => document.getElementById(id);
+const el = (t, p = {}, ...k) => { const n = Object.assign(document.createElement(t), p); n.append(...k); return n; };
+let tt; const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2200); };
+const students = () => Auth.users().filter(u => u.role === 'student');
+const today = () => new Date().toLocaleDateString('sv');
+const PETS = ['未孵化 🥚', 'Lv.1', 'Lv.2', 'Lv.3 👑'];
+
+// 在学生存档上加金币/星星（学生没有存档时，从初始值开始算）
+function award(id, c, s) {
+  const d = Auth.loadSave(id) || {};
+  d.coins = Math.max(0, (d.coins ?? Auth.START.coins) + c);
+  d.stars = Math.max(0, (d.stars ?? Auth.START.stars) + s);
+  Auth.writeSave(id, d);
+}
+const askNum = msg => { const n = parseInt(prompt(msg), 10); return Number.isFinite(n) ? n : null; };
+const btn = (text, a, id, cls = 'b') => { const b = el('button', { className: cls, textContent: text }); b.dataset.a = a; if (id) b.dataset.id = id; return b; };
+
+function renderNotices() {
+  const box = $('notice-list'); box.replaceChildren();
+  const stu = students(), all = Auth.notices();
+  if (!all.length) return box.append(el('div', { className: 'empty', textContent: '还没有发布过内容。' }));
+  all.forEach(n => {
+    const kids = [
+      el('div', { style: 'display:flex;justify-content:space-between;gap:8px;align-items:center' },
+        el('b', { textContent: `${Auth.KIND[n.type] || '🎯 任务'}${n.subject ? '｜' + n.subject : ''}：${n.title}` }), btn('删除', 'delnotice', n.id, 'b red')),
+      el('div', { textContent: n.body || '（无内容）', style: 'margin:4px 0;color:var(--muted);font-size:.85rem' })
+    ];
+    if (n.type !== 'notice') {
+      const st = id => Auth.sub(n, id)?.status;
+      const count = k => stu.filter(u => st(u.id) === k).length, todo = stu.filter(u => !st(u.id) || st(u.id) === 'rejected');
+      kids.push(el('div', { textContent: `奖励：${n.coins}🪙 ${n.stars}⭐　已完成 ${count('done')}　待批准 ${count('pending')}　已退回 ${count('rejected')}　${n.needProof ? '需证明' : '无需证明'}`, style: 'font-size:.85rem' }));
+      kids.push(el('div', { textContent: `未提交（${todo.length}）：${todo.map(u => u.name).join('、') || '无'}`, style: 'font-size:.85rem;color:#c22;margin-top:2px' }));
+      stu.filter(u => st(u.id) === 'pending').forEach(u => {
+        const sb = Auth.sub(n, u.id), photo = sb.photo && Auth.getProof(n.id, u.id);
+        const row = el('div', { style: 'border-top:1px dashed var(--border);margin-top:8px;padding-top:8px;font-size:.88rem' },
+          el('div', { textContent: `${u.name} 已提交（${new Date(sb.time || Date.now()).toLocaleString('zh-CN')}）` }),
+          el('div', { textContent: sb.note ? `说明：${sb.note}` : '（没有文字说明）', style: 'margin:2px 0;color:var(--muted)' }));
+        if (photo) {
+          const img = el('img', { src: photo, alt: `${u.name} 的证明照片`, style: 'max-width:140px;border-radius:8px;cursor:zoom-in;display:block;margin:4px 0' });
+          img.onclick = () => { img.style.maxWidth = img.style.maxWidth === '100%' ? '140px' : '100%'; };   // 点击放大/缩小
+          row.append(img);
+        }
+        row.append(el('div', { style: 'display:flex;gap:6px;margin-top:6px' },
+          btn('批准并发奖', 'approve', `${n.id}|${u.id}`, 'b gold'), btn('退回', 'reject', `${n.id}|${u.id}`, 'b ghost')));
+        kids.push(row);
+      });
+    }
+    box.append(el('div', { style: 'border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px' }, ...kids));
+  });
+}
+
+function render() {
+  renderNotices();
+  const list = students(), body = $('rows'); body.replaceChildren();
+  $('count').textContent = list.length; $('empty').hidden = list.length > 0;
+  list.forEach(u => {
+    const d = Auth.loadSave(u.id) || {};
+    const done = d.date === today() ? (d.completed || []).length : 0;
+    body.append(el('tr', {},
+      el('td', { textContent: `${u.name}（${u.id}）` }),
+      el('td', { textContent: PETS[d.petLevel || 0] || '-' }),
+      el('td', { textContent: d.coins ?? Auth.START.coins }),
+      el('td', { textContent: d.stars ?? Auth.START.stars }),
+      el('td', { textContent: `${done} / 5` }),
+      el('td', { className: 'act' },
+        btn('+金币', 'coin', u.id, 'b gold'), btn('+星星', 'star', u.id, 'b gold'),
+        btn('重置密码', 'reset', u.id, 'b ghost'), btn('删除', 'del', u.id, 'b red'))));
+  });
+}
+
+const A = {
+  logout: Auth.logout,
+  coin(id) { const n = askNum('发放多少金币？（负数为扣除）'); if (n) { award(id, n, 0); render(); toast('已更新金币'); } },
+  star(id) { const n = askNum('发放多少星星？（负数为扣除）'); if (n) { award(id, 0, n); render(); toast('已更新星星'); } },
+  awardAll() {
+    const c = parseInt($('a-coins').value, 10) || 0, s = parseInt($('a-stars').value, 10) || 0, list = students();
+    if (!list.length || (!c && !s)) return toast('请先填写奖励数量');
+    list.forEach(u => award(u.id, c, s)); render(); toast(`已发放给 ${list.length} 位学生`);
+  },
+  async add() {
+    const id = $('n-id').value.trim(), name = $('n-name').value.trim(), pw = $('n-pw').value;
+    if (!/^[A-Za-z0-9_-]{2,20}$/.test(id)) return toast('学号只能是 2-20 位字母、数字、- 或 _');
+    if (!name) return toast('请填写姓名');
+    if (pw.length < 4) return toast('密码至少 4 位');
+    const all = Auth.users();
+    if (all.some(u => u.id === id)) return toast('这个学号已存在');
+    all.push({ id, name, role: 'student', pw: await Auth.hash(id, pw) });
+    Auth.saveUsers(all); ['n-id', 'n-name', 'n-pw'].forEach(i => $(i).value = ''); render(); toast(`已添加 ${name}`);
+  },
+  async reset(id) {
+    const pw = prompt('输入新密码（至少 4 位）');
+    if (pw === null) return;
+    if (pw.length < 4) return toast('密码至少 4 位');
+    const all = Auth.users(), u = all.find(x => x.id === id);
+    u.pw = await Auth.hash(id, pw); Auth.saveUsers(all); toast('密码已重置');
+  },
+  del(id) {
+    const u = Auth.users().find(x => x.id === id);
+    if (!confirm(`确定删除 ${u.name}（${id}）？该学生的所有游戏数据也会被删除，无法恢复。`)) return;
+    Auth.saveUsers(Auth.users().filter(x => x.id !== id)); localStorage.removeItem(Auth.saveKey(id)); render(); toast('已删除');
+  },
+  publish() {
+    const type = $('p-type').value, task = type !== 'notice', title = $('p-title').value.trim();
+    if (!title) return toast('请填写标题');
+    const n = Auth.notices();
+    n.unshift({ id: 'n' + Date.now(), type, subject: $('p-subj').value, needProof: task && $('p-proof').checked, title, body: $('p-body').value.trim(),
+      coins: task ? Math.max(0, parseInt($('p-coins').value, 10) || 0) : 0,
+      stars: task ? Math.max(0, parseInt($('p-stars').value, 10) || 0) : 0, date: today(), subs: {} });
+    Auth.saveNotices(n); ['p-title', 'p-body'].forEach(i => $(i).value = ''); render(); toast('已发布');
+  },
+  delnotice(id) {
+    if (!confirm('确定删除这一条？')) return;
+    const n = Auth.notices().find(x => x.id === id);
+    if (n) Object.keys(n.subs).forEach(sid => Auth.delProof(id, sid));
+    Auth.saveNotices(Auth.notices().filter(x => x.id !== id)); render();
+  },
+  approve(id) {                                            // id = 公告id|学号
+    const [nid, sid] = id.split('|'), all = Auth.notices(), n = all.find(x => x.id === nid);
+    if (!n || Auth.sub(n, sid)?.status !== 'pending') return;
+    n.subs[sid] = { ...Auth.sub(n, sid), status: 'done' }; Auth.saveNotices(all); award(sid, n.coins, n.stars); render(); toast('已批准并发放奖励');
+  },
+  reject(id) {
+    const [nid, sid] = id.split('|'), all = Auth.notices(), n = all.find(x => x.id === nid);
+    if (!n || Auth.sub(n, sid)?.status !== 'pending') return;
+    const reply = prompt('退回原因（学生会看到）', '请补充清楚一点再提交');
+    if (reply === null) return;
+    n.subs[sid] = { ...Auth.sub(n, sid), status: 'rejected', reply: reply.trim() };
+    Auth.saveNotices(all); render(); toast('已退回，学生可以重新提交');
+  },
+  async mypw() {
+    const pw = prompt('输入新的老师密码（至少 6 位）');
+    if (pw === null) return;
+    if (pw.length < 6) return toast('老师密码至少 6 位');
+    const all = Auth.users(), u = all.find(x => x.id === me.id);
+    u.pw = await Auth.hash(u.id, pw); Auth.saveUsers(all); toast('密码已修改');
+  }
+};
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-a]');
+  if (t) A[t.dataset.a]?.(t.dataset.id);
+});
+window.addEventListener('storage', render);               // 学生在别的标签页打卡时，这里自动刷新
+
+$('me').textContent = me.name;
+Auth.SUBJECTS.forEach(x => $('p-subj').append(new Option(x, x)));
+Auth.ready.then(render);
+</script>
+</body>
+</html>
