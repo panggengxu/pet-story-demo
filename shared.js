@@ -49,6 +49,10 @@ const Auth = (() => {
   const RK = 'petsStory.records.v1';
   const records = () => { try { return JSON.parse(localStorage.getItem(RK)) || {}; } catch { return {}; } };
   const saveRecords = r => localStorage.setItem(RK, JSON.stringify(r));
+  // 主题名单（作文、专题等不按日期的项目）：[{id,kind,subject,title,due,done:['s001',...]}]
+  const TK = 'petsStory.topics.v1';
+  const topics = () => { try { return JSON.parse(localStorage.getItem(TK)) || []; } catch { return []; } };
+  const saveTopics = t => localStorage.setItem(TK, JSON.stringify(t));
   // 提交记录统一成 {status:'pending'|'done'|'rejected', note, photo, time, reply}（兼容旧版字符串）
   const sub = (n, id) => { const v = n.subs[id]; return typeof v === 'string' ? { status: v } : (v || null); };
   // 证明照片单独存放，避免公告数据过大；容量不足时 setProof 会抛错
@@ -57,5 +61,5 @@ const Auth = (() => {
   const setProof = (nid, sid, url) => localStorage.setItem(PK(nid, sid), url);
   const delProof = (nid, sid) => localStorage.removeItem(PK(nid, sid));
 
-  return { records, saveRecords, SUBJECTS, KIND, sub, getProof, setProof, delProof, NK, notices, saveNotices, START, hash, users, saveUsers, ready, session, login, logout, guard, saveKey, loadSave, writeSave };
+  return { topics, saveTopics, records, saveRecords, SUBJECTS, KIND, sub, getProof, setProof, delProof, NK, notices, saveNotices, START, hash, users, saveUsers, ready, session, login, logout, guard, saveKey, loadSave, writeSave };
 })();

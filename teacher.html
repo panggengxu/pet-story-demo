@@ -20,8 +20,9 @@ select,textarea{padding:8px 10px;border:1px solid var(--border);border-radius:8p
 textarea{width:100%;height:60px;resize:vertical;margin-top:8px}
 select:focus,textarea:focus{outline:3px solid var(--accent);outline-offset:1px}
 .chk{width:22px;height:22px;padding:0;cursor:pointer;accent-color:var(--ok)}
-#roster td,#roster th{text-align:center}#roster td:first-child,#roster th:first-child{text-align:left}
-#roster th .b{margin-top:4px;padding:3px 8px;font-size:.7rem}
+#roster td,#roster th,#topic-table td,#topic-table th{text-align:center}
+#roster td:first-child,#roster th:first-child,#topic-table td:first-child,#topic-table th:first-child{text-align:left}
+#roster th .b,#topic-table th .b{margin:4px 2px 0;padding:3px 8px;font-size:.7rem}
 .b{background:var(--primary);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.8rem}
 .b.gold{background:var(--accent);color:#000}.b.ghost{background:var(--bg);color:var(--text)}.b.red{background:#fde8e8;color:#c22}
 button:focus-visible,input:focus{outline:3px solid var(--accent);outline-offset:1px}
@@ -52,6 +53,24 @@ td.act{display:flex;gap:6px}
     <div style="margin:8px 0;font-size:.82rem;color:var(--muted)">在补习中心默写或做完功课，老师直接勾选即可，打勾自动保存。表头的“全勾”可一次勾选/取消全班。</div>
     <div class="scroll"><table id="roster"></table></div>
     <div id="roster-sum" style="margin-top:12px;font-size:.88rem;line-height:1.8"></div>
+  </section>
+
+  <section class="card">
+    <h2>📌 主题名单（作文、专题等）</h2>
+    <div class="row">
+      <label>类型<select id="t-kind"><option>功课</option><option>默写</option></select></label>
+      <label>科目<select id="t-subj"></select></label>
+      <label>主题名称<input id="t-title" maxlength="30" style="width:220px" placeholder="例如：我最敬爱的人"></label>
+      <label>截止日期（选填）<input id="t-due" type="date"></label>
+      <button class="b" data-a="addTopic">添加主题</button>
+    </div>
+    <div class="row" style="margin:12px 0 8px">
+      <label>查看<select id="t-filter"><option value="">全部科目</option></select></label>
+      <button class="b ghost" data-a="copyTopics">复制未完成名单</button>
+    </div>
+    <div style="margin-bottom:8px;font-size:.82rem;color:var(--muted)">主题不按日期计算，学生什么时候交都在同一格勾选。同一科目可以添加多个主题。</div>
+    <div class="scroll"><table id="topic-table"></table></div>
+    <div id="topic-sum" style="margin-top:12px;font-size:.88rem;line-height:1.8"></div>
   </section>
 
   <section class="card">
@@ -148,6 +167,34 @@ function renderSum() {
   });
 }
 
+// ===== 主题名单 =====
+const topicList = () => { const f = $('t-filter').value; return Auth.topics().filter(t => !f || t.subject === f); };
+function renderTopics() {
+  const stu = students(), list = topicList(), tb = $('topic-table');
+  tb.replaceChildren(); $('topic-sum').replaceChildren();
+  if (!list.length) return tb.append(el('caption', { className: 'empty', textContent: '还没有主题，请先在上方添加。' }));
+  if (!stu.length) return tb.append(el('caption', { className: 'empty', textContent: '还没有学生，请先在下方添加。' }));
+  tb.append(el('thead', {}, el('tr', {}, el('th', { textContent: '学生' }), ...list.map(t => el('th', {},
+    el('div', { textContent: t.title, style: 'font-weight:700' }),
+    el('div', { textContent: `${t.subject}·${t.kind}${t.due ? '·' + t.due.slice(5) + '截止' : ''}`, style: 'font-size:.7rem;color:var(--muted)' }),
+    btn('全勾', 'allTopic', t.id, 'b ghost'), btn('删除', 'delTopic', t.id, 'b red'))))));
+  const body = el('tbody');
+  stu.forEach(u => body.append(el('tr', {}, el('td', { textContent: u.name }), ...list.map(t => {
+    const c = el('input', { type: 'checkbox', className: 'chk', checked: t.done.includes(u.id) });
+    c.dataset.tid = t.id; c.dataset.tsid = u.id; c.setAttribute('aria-label', `${u.name} ${t.title}`);
+    return el('td', {}, c);
+  }))));
+  tb.append(body); renderTopicSum();
+}
+function renderTopicSum() {
+  const stu = students(), box = $('topic-sum'); box.replaceChildren();
+  topicList().forEach(t => {
+    const todo = stu.filter(u => !t.done.includes(u.id)), late = todo.length && t.due && t.due < today();
+    box.append(el('div', {}, el('b', { textContent: `${t.subject}「${t.title}」：` }), `已完成 ${stu.length - todo.length}/${stu.length}　`,
+      el('span', { textContent: todo.length ? `未完成：${todo.map(u => u.name).join('、')}${late ? '　⚠️已过截止' : ''}` : '✅ 全部完成', style: todo.length ? 'color:#c22' : 'color:var(--ok)' })));
+  });
+}
+
 function renderNotices() {
   const box = $('notice-list'); box.replaceChildren();
   const stu = students(), all = Auth.notices();
@@ -183,7 +230,7 @@ function renderNotices() {
 }
 
 function render() {
-  renderNotices(); renderRoster();
+  renderNotices(); renderRoster(); renderTopics();
   const list = students(), body = $('rows'); body.replaceChildren();
   $('count').textContent = list.length; $('empty').hidden = list.length > 0;
   list.forEach(u => {
@@ -252,6 +299,32 @@ const A = {
     if (!n || Auth.sub(n, sid)?.status !== 'pending') return;
     n.subs[sid] = { ...Auth.sub(n, sid), status: 'done' }; Auth.saveNotices(all); award(sid, n.coins, n.stars); render(); toast('已批准并发放奖励');
   },
+  addTopic() {
+    const title = $('t-title').value.trim();
+    if (!title) return toast('请填写主题名称');
+    const all = Auth.topics();
+    all.push({ id: 't' + Date.now(), kind: $('t-kind').value, subject: $('t-subj').value, title, due: $('t-due').value, done: [] });
+    Auth.saveTopics(all); $('t-title').value = ''; $('t-due').value = ''; renderTopics(); toast('已添加主题');
+  },
+  allTopic(id) {                                           // 该主题：全班一键勾选；已全勾则取消
+    const all = Auth.topics(), t = all.find(x => x.id === id), ids = students().map(u => u.id);
+    if (!t) return;
+    t.done = ids.every(i => t.done.includes(i)) ? [] : ids; Auth.saveTopics(all); renderTopics();
+  },
+  delTopic(id) {
+    const t = Auth.topics().find(x => x.id === id);
+    if (!t || !confirm(`确定删除主题「${t.title}」？勾选记录也会一起删除。`)) return;
+    Auth.saveTopics(Auth.topics().filter(x => x.id !== id)); renderTopics();
+  },
+  copyTopics() {
+    const stu = students();
+    const lines = topicList().map(t => {
+      const todo = stu.filter(u => !t.done.includes(u.id));
+      return todo.length ? `${t.subject}「${t.title}」未完成：${todo.map(u => u.name).join('、')}` : null;
+    }).filter(Boolean);
+    navigator.clipboard?.writeText(lines.join('\n') || '所有主题都已完成 ✅')
+      .then(() => toast('已复制未完成名单'), () => toast('复制失败，请手动选取页面上的文字'));
+  },
   allsubj(s) {                                             // 该科目：全班一键勾选；已全勾则取消
     const { d, k } = rState(), all = Auth.records(), key = rKey(d, k, s), ids = students().map(u => u.id);
     all[key] = ids.every(id => (all[key] || []).includes(id)) ? [] : ids;
@@ -291,6 +364,16 @@ window.addEventListener('storage', render);               // 学生在别的标�
 
 $('me').textContent = me.name;
 $('r-date').value = today(); $('r-date').onchange = $('r-kind').onchange = renderRoster;
+Auth.SUBJECTS.forEach(x => { $('t-subj').append(new Option(x, x)); $('t-filter').append(new Option(x, x)); });
+$('t-filter').onchange = renderTopics;
+document.addEventListener('change', e => {                 // 主题名单：勾选自动保存
+  const c = e.target.closest('[data-tid]');
+  if (!c) return;
+  const all = Auth.topics(), t = all.find(x => x.id === c.dataset.tid);
+  if (!t) return;
+  const set = new Set(t.done); c.checked ? set.add(c.dataset.tsid) : set.delete(c.dataset.tsid);
+  t.done = [...set]; Auth.saveTopics(all); renderTopicSum();
+});
 document.addEventListener('change', e => {                 // 勾选/取消勾选，自动保存
   const c = e.target.closest('[data-sid]');
   if (!c) return;
