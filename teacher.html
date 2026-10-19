@@ -187,13 +187,19 @@ function award(id, c, s) {
 const askNum = msg => { const n = parseInt(prompt(msg), 10); return Number.isFinite(n) ? n : null; };
 const btn = (text, a, id, cls = 'b') => { const b = el('button', { className: cls, textContent: text }); b.dataset.a = a; if (id) b.dataset.id = id; return b; };
 
+// 当前班级没有学生时的提示（带上班级名，避免以为是数据丢了）
+const emptyMsg = () => {
+  const c = Auth.classes().find(x => x.id === curClass);
+  return c ? `「${c.name}」还没有学生，请在下方添加，或在学生列表里用“转班”把学生转进来。` : '还没有可用的班级，请让管理员先创建班级。';
+};
+
 // ===== 默写 / 功课名单 =====
 const rState = () => ({ d: $('r-date').value || today(), k: $('r-kind').value });
 const rKey = (d, k, s) => `${d}|${k}|${s}`;
 function renderRoster() {
   const { d, k } = rState(), stu = students(), recs = Auth.records(), tb = $('roster');
-  tb.replaceChildren();
-  if (!stu.length) return tb.append(el('caption', { className: 'empty', textContent: '还没有学生，请先在下方添加。' }));
+  tb.replaceChildren(); $('roster-sum').replaceChildren();
+  if (!stu.length) return tb.append(el('caption', { className: 'empty', textContent: emptyMsg() }));
   tb.append(el('thead', {}, el('tr', {}, el('th', { textContent: '学生' }),
     ...Auth.SUBJECTS.map(s => el('th', {}, el('div', { textContent: s }), btn('全勾', 'allsubj', s, 'b ghost'))))));
   const body = el('tbody');
@@ -220,7 +226,7 @@ function renderTopics() {
   const stu = students(), list = topicList(), tb = $('topic-table');
   tb.replaceChildren(); $('topic-sum').replaceChildren();
   if (!list.length) return tb.append(el('caption', { className: 'empty', textContent: '还没有主题，请先在上方添加。' }));
-  if (!stu.length) return tb.append(el('caption', { className: 'empty', textContent: '还没有学生，请先在下方添加。' }));
+  if (!stu.length) return tb.append(el('caption', { className: 'empty', textContent: emptyMsg() }));
   tb.append(el('thead', {}, el('tr', {}, el('th', { textContent: '学生' }), ...list.map(t => el('th', {},
     el('div', { textContent: t.title, style: 'font-weight:700' }),
     el('div', { textContent: `${t.subject}·${t.kind}${t.due ? '·' + t.due.slice(5) + '截止' : ''}`, style: 'font-size:.7rem;color:var(--muted)' }),
