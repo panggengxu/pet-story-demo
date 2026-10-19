@@ -19,6 +19,9 @@ input{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-siz
 select,textarea{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:.9rem}
 textarea{width:100%;height:60px;resize:vertical;margin-top:8px}
 select:focus,textarea:focus{outline:3px solid var(--accent);outline-offset:1px}
+.chk{width:22px;height:22px;padding:0;cursor:pointer;accent-color:var(--ok)}
+#roster td,#roster th{text-align:center}#roster td:first-child,#roster th:first-child{text-align:left}
+#roster th .b{margin-top:4px;padding:3px 8px;font-size:.7rem}
 .b{background:var(--primary);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.8rem}
 .b.gold{background:var(--accent);color:#000}.b.ghost{background:var(--bg);color:var(--text)}.b.red{background:#fde8e8;color:#c22}
 button:focus-visible,input:focus{outline:3px solid var(--accent);outline-offset:1px}
@@ -38,6 +41,18 @@ td.act{display:flex;gap:6px}
     <div class="brand">👩‍🏫 老师后台 · <span id="me"></span></div>
     <div class="row"><button class="b ghost" data-a="mypw">修改我的密码</button><button class="b" data-a="logout">退出</button></div>
   </header>
+
+  <section class="card">
+    <h2>📝 默写 / 功课名单</h2>
+    <div class="row">
+      <label>日期<input id="r-date" type="date"></label>
+      <label>类型<select id="r-kind"><option>默写</option><option>功课</option></select></label>
+      <button class="b ghost" data-a="copyTodo">复制未完成名单</button>
+    </div>
+    <div style="margin:8px 0;font-size:.82rem;color:var(--muted)">在补习中心默写或做完功课，老师直接勾选即可，打勾自动保存。表头的“全勾”可一次勾选/取消全班。</div>
+    <div class="scroll"><table id="roster"></table></div>
+    <div id="roster-sum" style="margin-top:12px;font-size:.88rem;line-height:1.8"></div>
+  </section>
 
   <section class="card">
     <h2>🎁 全班奖励</h2>
@@ -106,6 +121,33 @@ function award(id, c, s) {
 const askNum = msg => { const n = parseInt(prompt(msg), 10); return Number.isFinite(n) ? n : null; };
 const btn = (text, a, id, cls = 'b') => { const b = el('button', { className: cls, textContent: text }); b.dataset.a = a; if (id) b.dataset.id = id; return b; };
 
+// ===== 默写 / 功课名单 =====
+const rState = () => ({ d: $('r-date').value || today(), k: $('r-kind').value });
+const rKey = (d, k, s) => `${d}|${k}|${s}`;
+function renderRoster() {
+  const { d, k } = rState(), stu = students(), recs = Auth.records(), tb = $('roster');
+  tb.replaceChildren();
+  if (!stu.length) return tb.append(el('caption', { className: 'empty', textContent: '还没有学生，请先在下方添加。' }));
+  tb.append(el('thead', {}, el('tr', {}, el('th', { textContent: '学生' }),
+    ...Auth.SUBJECTS.map(s => el('th', {}, el('div', { textContent: s }), btn('全勾', 'allsubj', s, 'b ghost'))))));
+  const body = el('tbody');
+  stu.forEach(u => body.append(el('tr', {}, el('td', { textContent: u.name }), ...Auth.SUBJECTS.map(s => {
+    const c = el('input', { type: 'checkbox', className: 'chk', checked: (recs[rKey(d, k, s)] || []).includes(u.id) });
+    c.dataset.sid = u.id; c.dataset.subj = s; c.setAttribute('aria-label', `${u.name} ${s}${k}`);
+    return el('td', {}, c);
+  }))));
+  tb.append(body); renderSum();
+}
+function renderSum() {
+  const { d, k } = rState(), stu = students(), recs = Auth.records(), box = $('roster-sum');
+  box.replaceChildren();
+  Auth.SUBJECTS.forEach(s => {
+    const done = recs[rKey(d, k, s)] || [], todo = stu.filter(u => !done.includes(u.id));
+    box.append(el('div', {}, el('b', { textContent: `${s}${k}：` }), `已完成 ${stu.length - todo.length}/${stu.length}　`,
+      el('span', { textContent: todo.length ? `未完成：${todo.map(u => u.name).join('、')}` : '✅ 全部完成', style: todo.length ? 'color:#c22' : 'color:var(--ok)' })));
+  });
+}
+
 function renderNotices() {
   const box = $('notice-list'); box.replaceChildren();
   const stu = students(), all = Auth.notices();
@@ -141,7 +183,7 @@ function renderNotices() {
 }
 
 function render() {
-  renderNotices();
+  renderNotices(); renderRoster();
   const list = students(), body = $('rows'); body.replaceChildren();
   $('count').textContent = list.length; $('empty').hidden = list.length > 0;
   list.forEach(u => {
@@ -210,6 +252,20 @@ const A = {
     if (!n || Auth.sub(n, sid)?.status !== 'pending') return;
     n.subs[sid] = { ...Auth.sub(n, sid), status: 'done' }; Auth.saveNotices(all); award(sid, n.coins, n.stars); render(); toast('已批准并发放奖励');
   },
+  allsubj(s) {                                             // 该科目：全班一键勾选；已全勾则取消
+    const { d, k } = rState(), all = Auth.records(), key = rKey(d, k, s), ids = students().map(u => u.id);
+    all[key] = ids.every(id => (all[key] || []).includes(id)) ? [] : ids;
+    Auth.saveRecords(all); renderRoster();
+  },
+  copyTodo() {                                             // 复制成文字，方便发给家长或同事
+    const { d, k } = rState(), recs = Auth.records(), stu = students();
+    const lines = Auth.SUBJECTS.map(s => {
+      const done = recs[rKey(d, k, s)] || [], todo = stu.filter(u => !done.includes(u.id));
+      return todo.length ? `${s}${k}未完成：${todo.map(u => u.name).join('、')}` : null;
+    }).filter(Boolean);
+    const text = `${d} ${k}名单\n` + (lines.join('\n') || '全部完成 ✅');
+    navigator.clipboard?.writeText(text).then(() => toast('已复制未完成名单'), () => toast('复制失败，请手动选取页面上的文字'));
+  },
   reject(id) {
     const [nid, sid] = id.split('|'), all = Auth.notices(), n = all.find(x => x.id === nid);
     if (!n || Auth.sub(n, sid)?.status !== 'pending') return;
@@ -234,6 +290,14 @@ document.addEventListener('click', e => {
 window.addEventListener('storage', render);               // 学生在别的标签页打卡时，这里自动刷新
 
 $('me').textContent = me.name;
+$('r-date').value = today(); $('r-date').onchange = $('r-kind').onchange = renderRoster;
+document.addEventListener('change', e => {                 // 勾选/取消勾选，自动保存
+  const c = e.target.closest('[data-sid]');
+  if (!c) return;
+  const { d, k } = rState(), all = Auth.records(), key = rKey(d, k, c.dataset.subj), set = new Set(all[key] || []);
+  c.checked ? set.add(c.dataset.sid) : set.delete(c.dataset.sid);
+  all[key] = [...set]; Auth.saveRecords(all); renderSum();
+});
 Auth.SUBJECTS.forEach(x => $('p-subj').append(new Option(x, x)));
 Auth.ready.then(render);
 </script>

@@ -44,6 +44,11 @@ const Auth = (() => {
   const saveNotices = n => localStorage.setItem(NK, JSON.stringify(n));
   const SUBJECTS = ['BC 华文', 'BM 马来文', 'BI 英文', 'MM 数学', 'SC 科学'];
   const KIND = { notice: '📢 公告', task: '🎯 任务', homework: '📚 功课' };
+  // 默写/功课名单（老师手动勾选，适用于补习中心等线下完成的情况）
+  // 格式：{ '2026-10-19|默写|BC 华文': ['s001', 's002'] }，数组里是“已完成”的学号
+  const RK = 'petsStory.records.v1';
+  const records = () => { try { return JSON.parse(localStorage.getItem(RK)) || {}; } catch { return {}; } };
+  const saveRecords = r => localStorage.setItem(RK, JSON.stringify(r));
   // 提交记录统一成 {status:'pending'|'done'|'rejected', note, photo, time, reply}（兼容旧版字符串）
   const sub = (n, id) => { const v = n.subs[id]; return typeof v === 'string' ? { status: v } : (v || null); };
   // 证明照片单独存放，避免公告数据过大；容量不足时 setProof 会抛错
@@ -52,5 +57,5 @@ const Auth = (() => {
   const setProof = (nid, sid, url) => localStorage.setItem(PK(nid, sid), url);
   const delProof = (nid, sid) => localStorage.removeItem(PK(nid, sid));
 
-  return { SUBJECTS, KIND, sub, getProof, setProof, delProof, NK, notices, saveNotices, START, hash, users, saveUsers, ready, session, login, logout, guard, saveKey, loadSave, writeSave };
+  return { records, saveRecords, SUBJECTS, KIND, sub, getProof, setProof, delProof, NK, notices, saveNotices, START, hash, users, saveUsers, ready, session, login, logout, guard, saveKey, loadSave, writeSave };
 })();
