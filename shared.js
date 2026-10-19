@@ -9,15 +9,29 @@ const Auth = (() => {
   const users = () => { try { return JSON.parse(localStorage.getItem(UK)) || []; } catch { return []; } };
   const saveUsers = u => localStorage.setItem(UK, JSON.stringify(u));
 
-  // 首次打开时创建演示账号
+  // 班级：[{id,name}]。学生有 classId；老师有 classIds（负责的班级）；admin:true 的老师可管理所有班级和老师账号
+  const CK = 'petsStory.classes.v1';
+  const classes = () => { try { return JSON.parse(localStorage.getItem(CK)) || []; } catch { return []; } };
+  const saveClasses = c => localStorage.setItem(CK, JSON.stringify(c));
+
+  // 首次打开时创建演示账号；旧数据（没有班级）自动迁移到“示范班”
   const ready = (async () => {
-    if (users().length) return;
-    const mk = async (id, name, role, pw) => ({ id, name, role, pw: await hash(id, pw) });
-    saveUsers([
-      await mk('teacher', '老师', 'teacher', 'teacher123'),
-      await mk('s001', '小明', 'student', '1234'),
-      await mk('s002', '小华', 'student', '1234')
-    ]);
+    if (!users().length) {
+      const mk = async (id, name, role, pw) => ({ id, name, role, pw: await hash(id, pw) });
+      saveUsers([
+        await mk('teacher', '老师', 'teacher', 'teacher123'),
+        await mk('s001', '小明', 'student', '1234'),
+        await mk('s002', '小华', 'student', '1234')
+      ]);
+    }
+    let cs = classes(), us = users(), changed = false;
+    if (!cs.length && us.some(x => x.role === 'student' && !x.classId)) { cs = [{ id: 'c1', name: '示范班' }]; saveClasses(cs); }
+    if (!us.some(x => x.admin)) { const t = us.find(x => x.role === 'teacher'); if (t) { t.admin = true; changed = true; } }
+    us.forEach(x => {
+      if (x.role === 'student' && !x.classId) { x.classId = cs[0].id; changed = true; }
+      if (x.role === 'teacher' && !x.classIds) { x.classIds = cs.map(c => c.id); changed = true; }
+    });
+    if (changed) saveUsers(us);
   })();
 
   const session = () => { try { return JSON.parse(sessionStorage.getItem(SK)); } catch { return null; } };
@@ -61,5 +75,5 @@ const Auth = (() => {
   const setProof = (nid, sid, url) => localStorage.setItem(PK(nid, sid), url);
   const delProof = (nid, sid) => localStorage.removeItem(PK(nid, sid));
 
-  return { topics, saveTopics, records, saveRecords, SUBJECTS, KIND, sub, getProof, setProof, delProof, NK, notices, saveNotices, START, hash, users, saveUsers, ready, session, login, logout, guard, saveKey, loadSave, writeSave };
+  return { classes, saveClasses, topics, saveTopics, records, saveRecords, SUBJECTS, KIND, sub, getProof, setProof, delProof, NK, notices, saveNotices, START, hash, users, saveUsers, ready, session, login, logout, guard, saveKey, loadSave, writeSave };
 })();

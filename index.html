@@ -335,8 +335,9 @@ const equippedNames = () => SLOTS.map(k => state.equipped[k]?.name).filter(Boole
 const owned = name => state.inventory.some(x => x.name === name) || equippedNames().includes(name);
 const isDup = (it, i) => state.inventory.some((x, j) => j !== i && x.name === it.name) || equippedNames().includes(it.name);
 
+const myClassId = () => Auth.users().find(u => u.id === me.id)?.classId;   // 每次读最新的，老师转班后立刻生效
 function renderNotices() {
-  const box = $('notice-box'), all = Auth.notices().slice(0, 6); box.replaceChildren();
+  const box = $('notice-box'), all = Auth.notices().filter(n => !n.classId || n.classId === myClassId()).slice(0, 6); box.replaceChildren();
   if (!all.length) return box.append(el('div', { className: 'hint', textContent: '老师还没有发布公告。' }));
   all.forEach(n => {
     const sb = Auth.sub(n, me.id), st = sb?.status;
@@ -556,7 +557,8 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(); });
 
 $('gacha-cost').textContent = GACHA_COST;
-$('me-name').textContent = me.name;
+const myClassName = Auth.classes().find(c => c.id === myClassId())?.name;
+$('me-name').textContent = me.name + (myClassName ? `（${myClassName}）` : '');
 $('proof-file').addEventListener('change', async e => {
   const f = e.target.files[0]; proofData = null; $('proof-img').hidden = true;
   if (!f) return;
