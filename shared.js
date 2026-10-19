@@ -1,65 +1,100 @@
-// 登录与账号模块：login.html / teacher.html / index.html 共用
-// 注意：数据都存在浏览器 localStorage 里，适合课堂演示，不是真正的安全系统。
+// 账号与班级模块（Supabase 版）。需要先加载 supabase-js：
+//   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.100.1/dist/umd/supabase.js"></script>
+// 阶段一：登录、账号、班级、老师负责的班级 → 存在 Supabase。
+// 公告/功课/名单/游戏存档 → 暂时仍存在浏览器里（后续阶段再迁移）。
 const Auth = (() => {
-  const UK = 'petsStory.users.v1', SK = 'petsStory.session';
-  const START = { coins: 500, stars: 10 };                 // 学生初始金币/星星（与 index.html 一致）
-  const sha = async t => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))]
-    .map(b => b.toString(16).padStart(2, '0')).join('');
-  const hash = (id, pw) => sha(id + ':' + pw);              // 用账号做盐，密码不明文保存
-  const users = () => { try { return JSON.parse(localStorage.getItem(UK)) || []; } catch { return []; } };
-  const saveUsers = u => localStorage.setItem(UK, JSON.stringify(u));
+  const SB_URL = 'https://fslirdwjwewfckdyzzrr.supabase.co';
+  const SB_KEY = 'sb_publishable_BGl41HJnvDH8K-rUbQqWmQ_XsHGBxrK';   // 公开的 publishable key，可以放在网页里
+  const DOMAIN = 'pets.test';                                         // 学号 → 假邮箱的后缀，要和 Edge Function 一致
+  const SK = 'petsStory.session';
+  const START = { coins: 500, stars: 10 };                            // 学生初始金币/星星（与 index.html 一致）
+  const sb = supabase.createClient(SB_URL, SB_KEY);
+  const email = code => `${String(code).trim().toLowerCase()}@${DOMAIN}`;
 
-  // 班级：[{id,name}]。学生有 classId；老师有 classIds（负责的班级）；admin:true 的老师可管理所有班级和老师账号
-  const CK = 'petsStory.classes.v1';
-  const classes = () => { try { return JSON.parse(localStorage.getItem(CK)) || []; } catch { return []; } };
-  const saveClasses = c => localStorage.setItem(CK, JSON.stringify(c));
-
-  // 首次打开时创建演示账号；旧数据（没有班级）自动迁移到“示范班”
-  const ready = (async () => {
-    await 0;                                     // 等下面的函数都定义完再执行
-    if (!users().length) {
-      const mk = async (id, name, role, pw) => ({ id, name, role, pw: await hash(id, pw) });
-      saveUsers([
-        await mk('teacher', '老师', 'teacher', 'teacher123'),
-        await mk('s001', '小明', 'student', '1234'),
-        await mk('s002', '小华', 'student', '1234')
-      ]);
-    }
-    let cs = classes(), us = users(), changed = false;
-    if (!cs.length && us.some(x => x.role === 'student' && !x.classId)) { cs = [{ id: 'c1', name: '示范班' }]; saveClasses(cs); }
-    if (!us.some(x => x.admin)) { const t = us.find(x => x.role === 'teacher'); if (t) { t.admin = true; changed = true; } }
-    us.forEach(x => {
-      if (x.role === 'student' && !x.classId) { x.classId = cs[0].id; changed = true; }
-      if (x.role === 'teacher' && !x.classIds) { x.classIds = cs.map(c => c.id); changed = true; }
-    });
-    if (changed) saveUsers(us);
-    const first = cs[0]?.id;                     // 旧的主题/公告（没有班级）归入第一个班，避免出现在所有班级里
-    if (first) {
-      const ts = topics(), ns = notices();
-      if (ts.some(t => !t.classId)) { ts.forEach(t => { t.classId ||= first; }); saveTopics(ts); }
-      if (ns.some(n => !n.classId)) { ns.forEach(n => { n.classId ||= first; }); saveNotices(ns); }
-    }
-  })();
-
-  const session = () => { try { return JSON.parse(sessionStorage.getItem(SK)); } catch { return null; } };
-  async function login(id, pw, role) {
-    await ready;
-    const u = users().find(x => x.id === id.trim());
-    if (!u || u.role !== role || u.pw !== await hash(u.id, pw)) return null;
-    sessionStorage.setItem(SK, JSON.stringify({ id: u.id, name: u.name, role: u.role })); // 关闭浏览器即退出
-    return u;
+  // ---- 缓存：登录后从 Supabase 读来的用户和班级（保持原来同步读取的用法） ----
+  let U = [], C = [];
+  const users = () => U;
+  const classes = () => C;
+  async function refresh() {
+    const [p, c, t] = await Promise.all([
+      sb.from('profiles').select('user_id,code,name,role,is_admin,class_id'),
+      sb.from('classes').select('id,name').order('created_at'),
+      sb.from('teacher_classes').select('teacher_id,class_id')
+    ]);
+    const err = p.error || c.error || t.error;
+    if (err) throw new Error(err.message);
+    const tc = {};
+    t.data.forEach(r => (tc[r.teacher_id] ||= []).push(r.class_id));
+    U = p.data.map(r => ({ uid: r.user_id, id: r.code, name: r.name, role: r.role, admin: r.is_admin, classId: r.class_id, classIds: tc[r.user_id] || [] }));
+    C = c.data;
   }
-  const logout = () => { sessionStorage.removeItem(SK); location.href = 'login.html'; };
-  const guard = role => {                                   // 页面入口检查：身份不对就回登录页
+
+  // ---- 会话 ----
+  const session = () => { try { return JSON.parse(sessionStorage.getItem(SK)); } catch { return null; } };
+  const setSession = u => sessionStorage.setItem(SK, JSON.stringify({ id: u.id, name: u.name, role: u.role }));
+  const ready = (async () => {                                        // 每个页面加载时：确认已登录并载入资料
+    try {
+      const { data } = await sb.auth.getSession();
+      if (!data.session) {
+        sessionStorage.removeItem(SK);
+        if (!/login\.html$/.test(location.pathname)) location.replace('login.html');
+        return;
+      }
+      await refresh();
+      const me = U.find(x => x.uid === data.session.user.id);
+      if (me) setSession(me);
+    } catch (e) { alert('连接服务器失败：' + e.message); throw e; }
+  })();
+  async function login(id, pw, role) {
+    const { error } = await sb.auth.signInWithPassword({ email: email(id), password: pw });
+    if (error) return null;
+    await refresh();
+    const { data: { user } } = await sb.auth.getUser();
+    const u = U.find(x => x.uid === user.id);
+    if (!u || u.role !== role) { await sb.auth.signOut(); return null; }
+    setSession(u); return u;
+  }
+  const logout = () => sb.auth.signOut().finally(() => { sessionStorage.removeItem(SK); location.href = 'login.html'; });
+  const guard = role => {                                             // 页面入口检查：身份不对就回登录页
     const s = session();
     if (!s || s.role !== role) { location.replace('login.html'); return null; }
     return s;
   };
-  const saveKey = id => 'petsStory.save.' + id;             // 每个学生独立存档
+
+  // ---- 班级 / 账号管理（权限由数据库的 RLS 和 Edge Function 把关） ----
+  const wrap = async p => {
+    const { error } = await p;
+    if (error) throw new Error(error.code === '23505' ? '名称或账号已存在' : error.message);
+    await refresh();
+  };
+  const addClass = name => wrap(sb.from('classes').insert({ name }));
+  const delClass = id => wrap(sb.from('classes').delete().eq('id', id));
+  const moveStudent = (uid, classId) => wrap(sb.from('profiles').update({ class_id: classId }).eq('user_id', uid));
+  const setTeacherClass = (uid, classId, on) => wrap(on
+    ? sb.from('teacher_classes').insert({ teacher_id: uid, class_id: classId })
+    : sb.from('teacher_classes').delete().eq('teacher_id', uid).eq('class_id', classId));
+  async function changeMyPassword(password) {
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) throw new Error(error.message);
+  }
+  // 调用 Edge Function：createStudent / createTeacher / resetPassword / deleteUser
+  async function call(action, payload) {
+    const { data, error } = await sb.functions.invoke('admin-users', { body: { action, ...payload } });
+    if (error) {
+      let msg = error.message;
+      try { msg = (await error.context.json()).error || msg; } catch (_) { /* ignore */ }
+      throw new Error(msg);
+    }
+    if (data?.error) throw new Error(data.error);
+    await refresh();
+    return data;
+  }
+
+  // ---- 每个学生的游戏存档（阶段二再迁移到 Supabase） ----
+  const saveKey = id => 'petsStory.save.' + id;
   const loadSave = id => { try { return JSON.parse(localStorage.getItem(saveKey(id))); } catch { return null; } };
   const writeSave = (id, o) => localStorage.setItem(saveKey(id), JSON.stringify(o));
 
-  // 公告与任务：{id,type:'notice'|'task',title,body,coins,stars,date,subs:{学号:'pending'|'done'}}
   const NK = 'petsStory.notices.v1';
   const notices = () => { try { return JSON.parse(localStorage.getItem(NK)) || []; } catch { return []; } };
   const saveNotices = n => localStorage.setItem(NK, JSON.stringify(n));
@@ -82,5 +117,7 @@ const Auth = (() => {
   const setProof = (nid, sid, url) => localStorage.setItem(PK(nid, sid), url);
   const delProof = (nid, sid) => localStorage.removeItem(PK(nid, sid));
 
-  return { classes, saveClasses, topics, saveTopics, records, saveRecords, SUBJECTS, KIND, sub, getProof, setProof, delProof, NK, notices, saveNotices, START, hash, users, saveUsers, ready, session, login, logout, guard, saveKey, loadSave, writeSave };
+  return { sb, refresh, call, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
+    users, classes, ready, session, login, logout, guard, START, saveKey, loadSave, writeSave,
+    topics, saveTopics, records, saveRecords, SUBJECTS, KIND, sub, getProof, setProof, delProof, NK, notices, saveNotices };
 })();

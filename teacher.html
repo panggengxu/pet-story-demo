@@ -142,6 +142,7 @@ td.act{display:flex;gap:6px}
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.100.1/dist/umd/supabase.js"></script>
 <script src="shared.js"></script>
 <script>
 const me = Auth.guard('teacher');
@@ -334,149 +335,66 @@ const A = {
     const id = $('n-id').value.trim(), name = $('n-name').value.trim(), pw = $('n-pw').value;
     if (!/^[A-Za-z0-9_-]{2,20}$/.test(id)) return toast('学号只能是 2-20 位字母、数字、- 或 _');
     if (!name) return toast('请填写姓名');
-    if (pw.length < 4) return toast('密码至少 4 位');
-    const all = Auth.users();
+    if (pw.length < 6) return toast('密码至少 6 位');
     if (!curClass) return toast('请先选择班级（没有班级请让管理员先创建）');
-    if (all.some(u => u.id === id)) return toast('这个学号已存在');
-    all.push({ id, name, role: 'student', classId: curClass, pw: await Auth.hash(id, pw) });
-    Auth.saveUsers(all); ['n-id', 'n-name', 'n-pw'].forEach(i => $(i).value = ''); render(); toast(`已添加 ${name}`);
+    try { await Auth.call('createStudent', { code: id, name, password: pw, classId: curClass }); }
+    catch (e) { return toast('添加失败：' + e.message); }
+    ['n-id', 'n-name', 'n-pw'].forEach(i => $(i).value = ''); render(); toast(`已添加 ${name}（学号会统一转成小写）`);
   },
-  move(id) {                                               // 把学生转到另一个班
+  async move(id) {                                               // 把学生转到另一个班
     const cs = myClasses(), u = Auth.users().find(x => x.id === id);
     const n = parseInt(prompt(`把 ${u.name} 转到哪个班？输入编号：\n` + cs.map((c, i) => `${i + 1}. ${c.name}`).join('\n')), 10);
     if (!cs[n - 1]) return;
-    const all = Auth.users(); all.find(x => x.id === id).classId = cs[n - 1].id;
-    Auth.saveUsers(all); render(); toast(`已转到 ${cs[n - 1].name}`);
+    try { await Auth.moveStudent(u.uid, cs[n - 1].id); } catch (e) { return toast('转班失败：' + e.message); }
+    render(); toast(`已转到 ${cs[n - 1].name}`);
   },
-  addClass() {
+  async addClass() {
     const name = $('c-name').value.trim();
     if (!name) return toast('请填写班级名称');
-    const cs = Auth.classes();
-    if (cs.some(c => c.name === name)) return toast('这个班级已存在');
-    cs.push({ id: 'c' + Date.now(), name }); Auth.saveClasses(cs); $('c-name').value = ''; render(); toast(`已添加 ${name}`);
+    try { await Auth.addClass(name); } catch (e) { return toast('添加失败：' + e.message); }
+    $('c-name').value = ''; render(); toast(`已添加 ${name}`);
   },
-  delClass(id) {
+  async delClass(id) {
     const c = Auth.classes().find(x => x.id === id);
     if (Auth.users().some(u => u.role === 'student' && u.classId === id)) return toast('这个班还有学生，请先把学生转到别的班');
     if (!c || !confirm(`确定删除班级 ${c.name}？`)) return;
-    Auth.saveClasses(Auth.classes().filter(x => x.id !== id));
-    const us = Auth.users(); us.forEach(u => { if (u.classIds) u.classIds = u.classIds.filter(x => x !== id); });
-    Auth.saveUsers(us); render();
+    try { await Auth.delClass(id); } catch (e) { return toast('删除失败：' + e.message); }
+    render();
   },
   async addTeacher() {
     const id = $('tc-id').value.trim(), name = $('tc-name').value.trim(), pw = $('tc-pw').value;
     if (!/^[A-Za-z0-9_-]{2,20}$/.test(id)) return toast('账号只能是 2-20 位字母、数字、- 或 _');
     if (!name) return toast('请填写姓名');
     if (pw.length < 6) return toast('老师密码至少 6 位');
-    const all = Auth.users();
-    if (all.some(u => u.id === id)) return toast('这个账号已存在');
-    all.push({ id, name, role: 'teacher', classIds: [], pw: await Auth.hash(id, pw) });
-    Auth.saveUsers(all); ['tc-id', 'tc-name', 'tc-pw'].forEach(i => $(i).value = ''); render(); toast(`已添加老师 ${name}，请勾选负责的班级`);
+    try { await Auth.call('createTeacher', { code: id, name, password: pw }); }
+    catch (e) { return toast('添加失败：' + e.message); }
+    ['tc-id', 'tc-name', 'tc-pw'].forEach(i => $(i).value = ''); render(); toast(`已添加老师 ${name}，请勾选负责的班级`);
   },
-  delTeacher(id) {
+  async delTeacher(id) {
     const t = Auth.users().find(x => x.id === id);
     if (!t || t.admin || !confirm(`确定删除老师 ${t.name}（${id}）？`)) return;
-    Auth.saveUsers(Auth.users().filter(x => x.id !== id)); render();
+    try { await Auth.call('deleteUser', { code: id }); } catch (e) { return toast('删除失败：' + e.message); }
+    render(); toast('已删除');
   },
   async reset(id) {
-    const pw = prompt('输入新密码（至少 4 位）');
+    const pw = prompt('输入新密码（至少 6 位）');
     if (pw === null) return;
-    if (pw.length < 4) return toast('密码至少 4 位');
-    const all = Auth.users(), u = all.find(x => x.id === id);
-    u.pw = await Auth.hash(id, pw); Auth.saveUsers(all); toast('密码已重置');
+    if (pw.length < 6) return toast('密码至少 6 位');
+    try { await Auth.call('resetPassword', { code: id, password: pw }); } catch (e) { return toast('重置失败：' + e.message); }
+    toast('密码已重置');
   },
-  del(id) {
+  async del(id) {
     const u = Auth.users().find(x => x.id === id);
-    if (!confirm(`确定删除 ${u.name}（${id}）？该学生的所有游戏数据也会被删除，无法恢复。`)) return;
-    Auth.saveUsers(Auth.users().filter(x => x.id !== id)); localStorage.removeItem(Auth.saveKey(id)); render(); toast('已删除');
-  },
-  publish() {
-    const type = $('p-type').value, task = type !== 'notice', title = $('p-title').value.trim();
-    const ids = [...document.querySelectorAll('[data-pc]:checked')].map(x => x.dataset.pc);
-    if (!title) return toast('请填写标题');
-    if (!ids.length) return toast('请至少选择一个班级');
-    const n = Auth.notices(), t0 = Date.now();
-    ids.reverse().forEach((cid, i) => n.unshift({                 // 每个班一份独立的公告/任务
-      id: 'n' + (t0 + i), batch: 'b' + t0, important: $('p-imp').checked, classId: cid, type, subject: $('p-subj').value, needProof: task && $('p-proof').checked, title, body: $('p-body').value.trim(),
-      coins: task ? Math.max(0, parseInt($('p-coins').value, 10) || 0) : 0,
-      stars: task ? Math.max(0, parseInt($('p-stars').value, 10) || 0) : 0, date: today(), subs: {} }));
-    Auth.saveNotices(n); ['p-title', 'p-body'].forEach(i => $(i).value = ''); $('p-imp').checked = false; render();
-    toast(`已发布给 ${ids.length} 个班级`);
-  },
-  pubAll() {                                               // 一键选中（或取消）所有可发布的班级
-    const boxes = [...document.querySelectorAll('[data-pc]')], all = boxes.every(b => b.checked);
-    boxes.forEach(b => b.checked = !all);
-    pubSel = new Set(boxes.filter(b => b.checked).map(b => b.dataset.pc));
-  },
-  delnotice(id) {
-    if (!confirm('确定删除这一条？')) return;
-    const all = Auth.notices(), n = all.find(x => x.id === id);
-    if (!n) return;
-    const same = n.batch ? all.filter(x => x.batch === n.batch && x.id !== id) : [];   // 同一次发布的其他班
-    const both = same.length && confirm(`这条还同时发给了另外 ${same.length} 个班。\n点“确定”一起删除，点“取消”只删除本班这一条。`);
-    const gone = new Set([id, ...(both ? same.map(x => x.id) : [])]);
-    all.filter(x => gone.has(x.id)).forEach(x => Object.keys(x.subs).forEach(sid => Auth.delProof(x.id, sid)));
-    Auth.saveNotices(all.filter(x => !gone.has(x.id))); render();
-  },
-  approve(id) {                                            // id = 公告id|学号
-    const [nid, sid] = id.split('|'), all = Auth.notices(), n = all.find(x => x.id === nid);
-    if (!n || Auth.sub(n, sid)?.status !== 'pending') return;
-    n.subs[sid] = { ...Auth.sub(n, sid), status: 'done' }; Auth.saveNotices(all); award(sid, n.coins, n.stars); render(); toast('已批准并发放奖励');
-  },
-  addTopic() {
-    const title = $('t-title').value.trim();
-    if (!title) return toast('请填写主题名称');
-    const all = Auth.topics();
-    all.push({ id: 't' + Date.now(), classId: curClass, kind: $('t-kind').value, subject: $('t-subj').value, title, due: $('t-due').value, done: [] });
-    Auth.saveTopics(all); $('t-title').value = ''; $('t-due').value = ''; renderTopics(); toast('已添加主题');
-  },
-  allTopic(id) {                                           // 该主题：全班一键勾选；已全勾则取消
-    const all = Auth.topics(), t = all.find(x => x.id === id), ids = students().map(u => u.id);
-    if (!t) return;
-    t.done = ids.every(i => t.done.includes(i)) ? [] : ids; Auth.saveTopics(all); renderTopics();
-  },
-  delTopic(id) {
-    const t = Auth.topics().find(x => x.id === id);
-    if (!t || !confirm(`确定删除主题「${t.title}」？勾选记录也会一起删除。`)) return;
-    Auth.saveTopics(Auth.topics().filter(x => x.id !== id)); renderTopics();
-  },
-  copyTopics() {
-    const stu = students();
-    const lines = topicList().map(t => {
-      const todo = stu.filter(u => !t.done.includes(u.id));
-      return todo.length ? `${t.subject}「${t.title}」未完成：${todo.map(u => u.name).join('、')}` : null;
-    }).filter(Boolean);
-    navigator.clipboard?.writeText(lines.join('\n') || '所有主题都已完成 ✅')
-      .then(() => toast('已复制未完成名单'), () => toast('复制失败，请手动选取页面上的文字'));
-  },
-  allsubj(s) {                                             // 该科目：全班一键勾选；已全勾则取消
-    const { d, k } = rState(), all = Auth.records(), key = rKey(d, k, s), ids = students().map(u => u.id);
-    all[key] = ids.every(id => (all[key] || []).includes(id)) ? [] : ids;
-    Auth.saveRecords(all); renderRoster();
-  },
-  copyTodo() {                                             // 复制成文字，方便发给家长或同事
-    const { d, k } = rState(), recs = Auth.records(), stu = students();
-    const lines = Auth.SUBJECTS.map(s => {
-      const done = recs[rKey(d, k, s)] || [], todo = stu.filter(u => !done.includes(u.id));
-      return todo.length ? `${s}${k}未完成：${todo.map(u => u.name).join('、')}` : null;
-    }).filter(Boolean);
-    const text = `${d} ${k}名单\n` + (lines.join('\n') || '全部完成 ✅');
-    navigator.clipboard?.writeText(text).then(() => toast('已复制未完成名单'), () => toast('复制失败，请手动选取页面上的文字'));
-  },
-  reject(id) {
-    const [nid, sid] = id.split('|'), all = Auth.notices(), n = all.find(x => x.id === nid);
-    if (!n || Auth.sub(n, sid)?.status !== 'pending') return;
-    const reply = prompt('退回原因（学生会看到）', '请补充清楚一点再提交');
-    if (reply === null) return;
-    n.subs[sid] = { ...Auth.sub(n, sid), status: 'rejected', reply: reply.trim() };
-    Auth.saveNotices(all); render(); toast('已退回，学生可以重新提交');
+    if (!confirm(`确定删除 ${u.name}（${id}）？该学生的账号会被删除，无法恢复。`)) return;
+    try { await Auth.call('deleteUser', { code: id }); } catch (e) { return toast('删除失败：' + e.message); }
+    localStorage.removeItem(Auth.saveKey(id)); render(); toast('已删除');
   },
   async mypw() {
     const pw = prompt('输入新的老师密码（至少 6 位）');
     if (pw === null) return;
     if (pw.length < 6) return toast('老师密码至少 6 位');
-    const all = Auth.users(), u = all.find(x => x.id === me.id);
-    u.pw = await Auth.hash(u.id, pw); Auth.saveUsers(all); toast('密码已修改');
+    try { await Auth.changeMyPassword(pw); } catch (e) { return toast('修改失败：' + e.message); }
+    toast('密码已修改');
   }
 };
 
@@ -511,13 +429,13 @@ document.addEventListener('change', e => {                 // 记住发布目标
   if (!e.target.closest('[data-pc]')) return;
   pubSel = new Set([...document.querySelectorAll('[data-pc]:checked')].map(x => x.dataset.pc));
 });
-document.addEventListener('change', e => {                 // 管理员勾选老师负责的班级
+document.addEventListener('change', async e => {           // 管理员勾选老师负责的班级
   const c = e.target.closest('[data-ac]');
   if (!c) return;
-  const all = Auth.users(), t = all.find(x => x.id === c.dataset.au);
+  const t = Auth.users().find(x => x.id === c.dataset.au);
   if (!t) return;
-  const set = new Set(t.classIds || []); c.checked ? set.add(c.dataset.ac) : set.delete(c.dataset.ac);
-  t.classIds = [...set]; Auth.saveUsers(all); toast('已保存');
+  try { await Auth.setTeacherClass(t.uid, c.dataset.ac, c.checked); toast('已保存'); }
+  catch (err) { c.checked = !c.checked; toast('保存失败：' + err.message); }
 });
 Auth.ready.then(render);
 </script>

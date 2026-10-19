@@ -198,6 +198,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
   </div>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.100.1/dist/umd/supabase.js"></script>
 <script src="shared.js"></script>
 
 <script>
@@ -568,6 +569,10 @@ $('proof-file').addEventListener('change', async e => {
 // 老师发放奖励后，学生页面自动更新
 window.addEventListener('storage', e => { if (e.key === SAVE_KEY || e.key === Auth.NK) { load(); render(); renderMessages(); } });
 load(); render(); renderMessages();
+Auth.ready.then(() => {                                    // 账号和班级资料加载完后，更新班级名和公告
+  const cn = Auth.classes().find(c => c.id === myClassId())?.name;
+  $('me-name').textContent = me.name + (cn ? `（${cn}）` : ''); render();
+}).catch(() => {});
 </script>
 </body>
 </html>

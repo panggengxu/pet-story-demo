@@ -39,16 +39,19 @@ input:focus,button:focus-visible{outline:3px solid var(--accent);outline-offset:
     <div id="err" role="alert"></div>
     <button class="go" id="go">登录</button>
   </form>
-  <div class="demo">演示账号（上线前请删除这段提示）<br>老师：teacher / teacher123<br>学生：s001 / 1234，s002 / 1234</div>
+  
 </main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.100.1/dist/umd/supabase.js"></script>
 <script src="shared.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const HOME = { student: 'index.html', teacher: 'teacher.html' };
 let role = 'student';
 
-const s = Auth.session();
-if (s) location.replace(HOME[s.role]);                    // 已登录就直接进入
+Auth.ready.then(() => {                                   // 已登录就直接进入
+  const s = Auth.session();
+  if (s) location.replace(HOME[s.role]);
+}).catch(() => {});
 
 document.querySelectorAll('.role').forEach(b => b.onclick = () => {
   role = b.dataset.role;
@@ -65,7 +68,7 @@ $('f').onsubmit = async e => {
     if (u) return location.href = HOME[u.role];
     $('err').textContent = '账号或密码错误，或身份选择不对';
   } catch {
-    $('err').textContent = '无法登录：请用 https、localhost 或直接打开本地文件';
+    $('err').textContent = '无法连接服务器，请检查网络后重试';
   }
   $('go').disabled = false;
 };
