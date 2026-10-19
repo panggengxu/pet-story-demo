@@ -16,6 +16,7 @@ const Auth = (() => {
 
   // 首次打开时创建演示账号；旧数据（没有班级）自动迁移到“示范班”
   const ready = (async () => {
+    await 0;                                     // 等下面的函数都定义完再执行
     if (!users().length) {
       const mk = async (id, name, role, pw) => ({ id, name, role, pw: await hash(id, pw) });
       saveUsers([
@@ -32,6 +33,12 @@ const Auth = (() => {
       if (x.role === 'teacher' && !x.classIds) { x.classIds = cs.map(c => c.id); changed = true; }
     });
     if (changed) saveUsers(us);
+    const first = cs[0]?.id;                     // 旧的主题/公告（没有班级）归入第一个班，避免出现在所有班级里
+    if (first) {
+      const ts = topics(), ns = notices();
+      if (ts.some(t => !t.classId)) { ts.forEach(t => { t.classId ||= first; }); saveTopics(ts); }
+      if (ns.some(n => !n.classId)) { ns.forEach(n => { n.classId ||= first; }); saveNotices(ns); }
+    }
   })();
 
   const session = () => { try { return JSON.parse(sessionStorage.getItem(SK)); } catch { return null; } };
