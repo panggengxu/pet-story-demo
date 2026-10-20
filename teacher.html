@@ -70,7 +70,10 @@ td.act{display:flex;gap:6px}
     </div>
     <div style="margin:8px 0;font-size:.82rem;color:var(--muted)">在补习中心默写或做完功课，老师直接勾选即可，打勾自动保存。表头的“全勾”可一次勾选/取消全班。</div>
     <div class="scroll"><table id="roster"></table></div>
-    <div id="roster-sum" style="margin-top:12px;font-size:.88rem;line-height:1.8"></div>
+    <details style="margin-top:12px">
+      <summary id="roster-sum-title" style="cursor:pointer;font-weight:700;font-size:.9rem">📋 各科未完成名单</summary>
+      <div id="roster-sum" style="margin-top:8px;font-size:.88rem;line-height:1.8"></div>
+    </details>
   </section>
 
   <section class="card">
@@ -88,7 +91,10 @@ td.act{display:flex;gap:6px}
     </div>
     <div style="margin-bottom:8px;font-size:.82rem;color:var(--muted)">主题不按日期计算，学生什么时候交都在同一格勾选。同一科目可以添加多个主题。</div>
     <div class="scroll"><table id="topic-table"></table></div>
-    <div id="topic-sum" style="margin-top:12px;font-size:.88rem;line-height:1.8"></div>
+    <details style="margin-top:12px">
+      <summary id="topic-sum-title" style="cursor:pointer;font-weight:700;font-size:.9rem">📌 各主题未完成名单</summary>
+      <div id="topic-sum" style="margin-top:8px;font-size:.88rem;line-height:1.8"></div>
+    </details>
   </section>
 
   <section class="card">
@@ -212,7 +218,7 @@ const rState = () => ({ d: $('r-date').value || today(), k: $('r-kind').value })
 const rKey = (d, k, s) => `${d}|${k}|${s}`;
 function renderRoster() {
   const { d, k } = rState(), stu = students(), recs = Auth.records(), tb = $('roster');
-  tb.replaceChildren(); $('roster-sum').replaceChildren();
+  tb.replaceChildren(); $('roster-sum').replaceChildren(); $('roster-sum-title').textContent = '📋 各科未完成名单';
   if (!stu.length) return tb.append(el('caption', { className: 'empty', textContent: emptyMsg() }));
   tb.append(el('thead', {}, el('tr', {}, el('th', { textContent: '学生' }),
     ...Auth.SUBJECTS.map(s => el('th', {}, el('div', { textContent: s }), btn('全勾', 'allsubj', s, 'b ghost'))))));
@@ -227,18 +233,21 @@ function renderRoster() {
 function renderSum() {
   const { d, k } = rState(), stu = students(), recs = Auth.records(), box = $('roster-sum');
   box.replaceChildren();
+  let left = 0;
   Auth.SUBJECTS.forEach(s => {
     const done = recs[rKey(d, k, s)] || [], todo = stu.filter(u => !done.includes(u.id));
+    left += todo.length;
     box.append(el('div', {}, el('b', { textContent: `${s}${k}：` }), `已完成 ${stu.length - todo.length}/${stu.length}　`,
       el('span', { textContent: todo.length ? `未完成：${todo.map(u => u.name).join('、')}` : '✅ 全部完成', style: todo.length ? 'color:#c22' : 'color:var(--ok)' })));
   });
+  $('roster-sum-title').textContent = `📋 各科未完成名单（${left ? `共 ${left} 项未完成` : '全部完成 ✅'}）`;
 }
 
 // ===== 主题名单 =====
 const topicList = () => { const f = $('t-filter').value; return Auth.topics().filter(t => t.classId === curClass && (!f || t.subject === f)); };
 function renderTopics() {
   const stu = students(), list = topicList(), tb = $('topic-table');
-  tb.replaceChildren(); $('topic-sum').replaceChildren();
+  tb.replaceChildren(); $('topic-sum').replaceChildren(); $('topic-sum-title').textContent = '📌 各主题未完成名单';
   if (!list.length) return tb.append(el('caption', { className: 'empty', textContent: '还没有主题，请先在上方添加。' }));
   if (!stu.length) return tb.append(el('caption', { className: 'empty', textContent: emptyMsg() }));
   tb.append(el('thead', {}, el('tr', {}, el('th', { textContent: '学生' }), ...list.map(t => el('th', {},
@@ -255,11 +264,15 @@ function renderTopics() {
 }
 function renderTopicSum() {
   const stu = students(), box = $('topic-sum'); box.replaceChildren();
-  topicList().forEach(t => {
+  let left = 0;
+  const list = topicList();
+  list.forEach(t => {
     const todo = stu.filter(u => !t.done.includes(u.id)), late = todo.length && t.due && t.due < today();
+    left += todo.length;
     box.append(el('div', {}, el('b', { textContent: `${t.subject}「${t.title}」：` }), `已完成 ${stu.length - todo.length}/${stu.length}　`,
       el('span', { textContent: todo.length ? `未完成：${todo.map(u => u.name).join('、')}${late ? '　⚠️已过截止' : ''}` : '✅ 全部完成', style: todo.length ? 'color:#c22' : 'color:var(--ok)' })));
   });
+  $('topic-sum-title').textContent = `📌 各主题未完成名单${list.length ? `（${left ? `共 ${left} 项未完成` : '全部完成 ✅'}）` : ''}`;
 }
 
 function renderNotices() {
