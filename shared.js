@@ -223,7 +223,14 @@ const Auth = (() => {
     const { error } = await sb.auth.updateUser({ password });
     if (error) throw new Error(error.message);
   }
-  // 调用 Edge Function：createStudent / createTeacher / resetPassword / deleteUser
+  // 一键升班：moves = [{ to: 目标班级id, uids: [学生id...] }]，在数据库里一次完成，失败就整体回滚
+  async function promote(moves) {
+    const { data, error } = await sb.rpc('promote_students', { moves });
+    if (error) throw new Error(error.message);
+    await refresh();
+    return data;
+  }
+  // 调用 Edge Function：createStudent / createTeacher / updateUser / resetPassword / deleteUser
   async function call(action, payload) {
     const { data, error } = await sb.functions.invoke('admin-users', { body: { action, ...payload } });
     if (error) {
@@ -236,7 +243,7 @@ const Auth = (() => {
     return data;
   }
 
-  return { sb, refresh, loadDay, busy, call, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
+  return { sb, refresh, loadDay, busy, call, promote, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
     users, classes, ready, session, login, logout, guard, START, SUBJECTS, KIND, saveKey,
     notices, saveNotices, topics, saveTopics, records, saveRecords, sub, setProof, delProof, proofUrl,
     grant, claimAwards, pendingAward, loadSave, fetchMySave, pushMySave };
