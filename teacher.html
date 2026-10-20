@@ -196,13 +196,8 @@ function renderAdmin() {
 const today = () => new Date().toLocaleDateString('sv');
 const PETS = ['未孵化 🥚', 'Lv.1', 'Lv.2', 'Lv.3 👑'];
 
-// 在学生存档上加金币/星星（学生没有存档时，从初始值开始算）
-function award(id, c, s) {
-  const d = Auth.loadSave(id) || {};
-  d.coins = Math.max(0, (d.coins ?? Auth.START.coins) + c);
-  d.stars = Math.max(0, (d.stars ?? Auth.START.stars) + s);
-  Auth.writeSave(id, d);
-}
+// 发放金币/星星：写入“奖励记录”，学生下次打开游戏页面时自动领取（不会和学生的存档互相覆盖）
+function award(id, c, s, note) { Auth.grant(id, c, s, note || ''); }
 const askNum = msg => { const n = parseInt(prompt(msg), 10); return Number.isFinite(n) ? n : null; };
 const btn = (text, a, id, cls = 'b') => { const b = el('button', { className: cls, textContent: text }); b.dataset.a = a; if (id) b.dataset.id = id; return b; };
 
@@ -284,13 +279,14 @@ function renderNotices() {
       kids.push(el('div', { textContent: `奖励：${n.coins}🪙 ${n.stars}⭐　已完成 ${count('done')}　待批准 ${count('pending')}　已退回 ${count('rejected')}　${n.needProof ? '需证明' : '无需证明'}`, style: 'font-size:.85rem' }));
       kids.push(el('div', { textContent: `未提交（${todo.length}）：${todo.map(u => u.name).join('、') || '无'}`, style: 'font-size:.85rem;color:#c22;margin-top:2px' }));
       stu.filter(u => st(u.id) === 'pending').forEach(u => {
-        const sb = Auth.sub(n, u.id), photo = sb.photo && Auth.getProof(n.id, u.id);
+        const sb = Auth.sub(n, u.id), photo = sb.photo;
         const row = el('div', { style: 'border-top:1px dashed var(--border);margin-top:8px;padding-top:8px;font-size:.88rem' },
           el('div', { textContent: `${u.name} 已提交（${new Date(sb.time || Date.now()).toLocaleString('zh-CN')}）` }),
           el('div', { textContent: sb.note ? `说明：${sb.note}` : '（没有文字说明）', style: 'margin:2px 0;color:var(--muted)' }));
         if (photo) {
-          const img = el('img', { src: photo, alt: `${u.name} 的证明照片`, style: 'max-width:140px;border-radius:8px;cursor:zoom-in;display:block;margin:4px 0' });
+          const img = el('img', { alt: `${u.name} 的证明照片`, style: 'max-width:140px;border-radius:8px;cursor:zoom-in;display:block;margin:4px 0' });
           img.onclick = () => { img.style.maxWidth = img.style.maxWidth === '100%' ? '140px' : '100%'; };   // 点击放大/缩小
+          Auth.proofUrl(n.id, u.id).then(url => { if (url) img.src = url; });   // 照片在私有存储里，取临时链接
           row.append(img);
         }
         row.append(el('div', { style: 'display:flex;gap:6px;margin-top:6px' },
@@ -308,13 +304,13 @@ function render() {
   const list = students(), body = $('rows'); body.replaceChildren();
   $('count').textContent = list.length; $('empty').hidden = list.length > 0;
   list.forEach(u => {
-    const d = Auth.loadSave(u.id) || {};
+    const d = Auth.loadSave(u.id) || {}, pa = Auth.pendingAward(u.id);
     const done = d.date === today() ? (d.completed || []).length : 0;
     body.append(el('tr', {},
       el('td', { textContent: `${u.name}（${u.id}）` }),
       el('td', { textContent: PETS[d.petLevel || 0] || '-' }),
-      el('td', { textContent: d.coins ?? Auth.START.coins }),
-      el('td', { textContent: d.stars ?? Auth.START.stars }),
+      el('td', { textContent: `${d.coins ?? Auth.START.coins}${pa && pa.coins ? `（待领 ${pa.coins > 0 ? '+' : ''}${pa.coins}）` : ''}` }),
+      el('td', { textContent: `${d.stars ?? Auth.START.stars}${pa && pa.stars ? `（待领 ${pa.stars > 0 ? '+' : ''}${pa.stars}）` : ''}` }),
       el('td', { textContent: `${done} / 5` }),
       el('td', { className: 'act' },
         btn('+金币', 'coin', u.id, 'b gold'), btn('+星星', 'star', u.id, 'b gold'),
@@ -396,7 +392,7 @@ const A = {
     if (!ids.length) return toast('请至少选择一个班级');
     const n = Auth.notices(), t0 = Date.now();
     ids.reverse().forEach((cid, i) => n.unshift({                 // 每个班一份独立的公告/任务
-      id: 'n' + (t0 + i), batch: 'b' + t0, important: $('p-imp').checked, classId: cid, type, subject: $('p-subj').value,
+      id: crypto.randomUUID(), batch: 'b' + t0, important: $('p-imp').checked, classId: cid, type, subject: $('p-subj').value,
       needProof: task && $('p-proof').checked, title, body: $('p-body').value.trim(),
       coins: task ? Math.max(0, parseInt($('p-coins').value, 10) || 0) : 0,
       stars: task ? Math.max(0, parseInt($('p-stars').value, 10) || 0) : 0, date: today(), subs: {} }));
@@ -427,7 +423,7 @@ const A = {
     const title = $('t-title').value.trim();
     if (!title) return toast('请填写主题名称');
     const all = Auth.topics();
-    all.push({ id: 't' + Date.now(), classId: curClass, kind: $('t-kind').value, subject: $('t-subj').value, title, due: $('t-due').value, done: [] });
+    all.push({ id: crypto.randomUUID(), classId: curClass, kind: $('t-kind').value, subject: $('t-subj').value, title, due: $('t-due').value, done: [] });
     Auth.saveTopics(all); $('t-title').value = ''; $('t-due').value = ''; renderTopics(); toast('已添加主题');
   },
   allTopic(id) {                                           // 该主题：全班一键勾选；已全勾则取消
@@ -487,7 +483,8 @@ document.addEventListener('click', e => {
 window.addEventListener('storage', render);               // 学生在别的标签页打卡时，这里自动刷新
 
 $('me').textContent = me.name;
-$('r-date').value = today(); $('r-date').onchange = $('r-kind').onchange = renderRoster;
+$('r-date').value = today(); $('r-date').onchange = async () => { await Auth.loadDay(rState().d); renderRoster(); };   // 切换日期时载入那天的记录
+$('r-kind').onchange = renderRoster;
 Auth.SUBJECTS.forEach(x => { $('t-subj').append(new Option(x, x)); $('t-filter').append(new Option(x, x)); });
 $('t-filter').onchange = renderTopics;
 document.addEventListener('change', e => {                 // 主题名单：勾选自动保存
@@ -520,6 +517,7 @@ document.addEventListener('change', async e => {           // 管理员勾选老
   catch (err) { c.checked = !c.checked; toast('保存失败：' + err.message); }
 });
 Auth.ready.then(render);
+setInterval(() => { if (!document.hidden && !Auth.busy()) Auth.refresh().then(render).catch(() => {}); }, 30000);   // 每 30 秒同步一次最新数据
 </script>
 </body>
 </html>

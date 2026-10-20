@@ -254,8 +254,8 @@ const state = {
   equipped: Object.fromEntries(SLOTS.map(s => [s, null])), petLevel: 0, messages: [],
   pet: { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0 }
 };
-function load() {
-  try { Object.assign(state, JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); } catch {}
+function load(remote) {                                   // remote：云端存档；没有就用本机备份
+  try { Object.assign(state, remote || JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); } catch {}
   if (!PET_STAGES[state.petLevel]) state.petLevel = 0;
   if (state.date !== today()) { state.completed = []; state.date = today(); } // 每日重置打卡
   const p = state.pet = { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0, ...state.pet };
@@ -263,7 +263,11 @@ function load() {
   p.mood = Math.max(0, p.mood - h * 3); p.tick += h * 36e5;
   if (p.day !== today()) { p.day = today(); p.feed = p.play = p.pat = 0; }
 }
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch {} }
+let synced = false;                                        // 云端存档读取完成后才允许上传，避免旧数据覆盖云端
+function save() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch {}
+  if (synced) Auth.pushMySave(state);
+}
 
 // ===== 工具 =====
 const $ = id => document.getElementById(id);
@@ -566,12 +570,31 @@ $('proof-file').addEventListener('change', async e => {
   try { proofData = await shrink(f); $('proof-img').src = proofData; $('proof-img').hidden = false; }
   catch { toast('⚠️ 这张图片无法读取，请换一张'); e.target.value = ''; }
 });
-// 老师发放奖励后，学生页面自动更新
-window.addEventListener('storage', e => { if (e.key === SAVE_KEY || e.key === Auth.NK) { load(); render(); renderMessages(); } });
-load(); render(); renderMessages();
-Auth.ready.then(() => {                                    // 账号和班级资料加载完后，更新班级名和公告
+load(); render(); renderMessages();                        // 先用本机备份快速显示
+async function claim() {                                   // 领取老师发放的金币/星星
+  const got = await Auth.claimAwards();
+  if (!got.length) return;
+  const c = got.reduce((n, x) => n + x.coins, 0), t = got.reduce((n, x) => n + x.stars, 0);
+  state.coins = Math.max(0, state.coins + c); state.stars = Math.max(0, state.stars + t);
+  save(); Auth.pushMySave(state, true);
+  toast(`🎁 老师发放了 ${c}🪙 ${t}⭐`);
+}
+async function poll() {                                    // 同步老师新发布的公告和奖励
+  try { await Auth.refresh(); await claim(); render(); } catch (e) { /* 网络不好时下次再试 */ }
+}
+Auth.ready.then(async () => {
   const cn = Auth.classes().find(c => c.id === myClassId())?.name;
-  $('me-name').textContent = me.name + (cn ? `（${cn}）` : ''); render();
+  $('me-name').textContent = me.name + (cn ? `（${cn}）` : '');
+  try {
+    const remote = await Auth.fetchMySave();               // 云端存档优先；没有就把本机进度上传（首次迁移）
+    if (remote) load(remote);
+    synced = true;
+    await claim();
+  } catch (e) { toast('⚠️ 暂时无法同步存档，请检查网络'); }
+  render(); renderMessages();
+  setInterval(() => { if (!document.hidden) poll(); }, 30000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) Auth.pushMySave(state, true); } else poll(); });
+  window.addEventListener('pagehide', () => { if (synced) Auth.pushMySave(state, true); });
 }).catch(() => {});
 </script>
 </body>
