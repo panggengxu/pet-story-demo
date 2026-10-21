@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老师后台 · Pets Story</title>
+<style>
+:root{--bg:#f4f7fe;--primary:#4318ff;--accent:#ffb800;--text:#2b3674;--muted:#a3aed0;--border:#e9edf7;--soft:#f8f9fc;--ok:#05cd99}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,sans-serif}
+body{background:var(--bg);color:var(--text);padding:16px}
+.wrap{max-width:1100px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:#fff;padding:14px 20px;border-radius:16px;margin-bottom:16px}
+.brand{font-weight:bold;color:var(--primary)}
+.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,.03)}
+h2{font-size:1.05rem;margin-bottom:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.row label{font-size:.75rem;font-weight:700;display:flex;flex-direction:column;gap:4px}
+input{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:.9rem;width:140px}
+select,textarea{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:.9rem}
+textarea{width:100%;height:60px;resize:vertical;margin-top:8px}
+select:focus,textarea:focus{outline:3px solid var(--accent);outline-offset:1px}
+.chk{width:22px;height:22px;padding:0;cursor:pointer;accent-color:var(--ok)}
+#roster td,#roster th,#topic-table td,#topic-table th{text-align:center}
+#roster td:first-child,#roster th:first-child,#topic-table td:first-child,#topic-table th:first-child{text-align:left}
+#roster th .b,#topic-table th .b{margin:4px 2px 0;padding:3px 8px;font-size:.7rem}
+.b{background:var(--primary);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.8rem}
+.b.gold{background:var(--accent);color:#000}.b.ghost{background:var(--bg);color:var(--text)}.b.red{background:#fde8e8;color:#c22}
+button:focus-visible,input:focus{outline:3px solid var(--accent);outline-offset:1px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:640px}
+th,td{padding:10px 8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-size:.75rem}
+td.act{display:flex;gap:6px}
+.empty{color:var(--muted);padding:12px 0}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 18px;border-radius:10px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">👩‍🏫 老师后台 · <span id="me"></span></div>
+    <label style="font-size:.85rem;font-weight:700">当前班级 <select id="cls" aria-label="当前班级"></select></label>
+    <div class="row"><button class="b ghost" data-a="mypw">修改我的密码</button><button class="b" data-a="logout">退出</button></div>
+  </header>
+
+  <section class="card" id="admin-card" hidden>
+    <h2>🏫 班级与老师管理（仅管理员可见）</h2>
+    <div class="row">
+      <label>新班级名称<input id="c-name" maxlength="20" placeholder="例如：三年甲班"></label>
+      <button class="b" data-a="addClass">添加班级</button>
+    </div>
+    <div id="class-list" style="margin:10px 0 16px;font-size:.9rem"></div>
+    <div class="row">
+      <label>老师账号<input id="tc-id" maxlength="20"></label>
+      <label>姓名<input id="tc-name" maxlength="40"></label>
+      <label>初始密码（至少 6 位）<input id="tc-pw" maxlength="30"></label>
+      <button class="b" data-a="addTeacher">添加老师</button>
+    </div>
+    <div style="margin:10px 0 4px;font-size:.82rem;color:var(--muted)">勾选每位老师负责的班级（管理员默认负责全部班级）：</div>
+    <div id="teacher-list"></div>
+  </section>
+
+  <section class="card">
+    <h2>📝 默写 / 功课名单</h2>
+    <div class="row">
+      <label>日期<input id="r-date" type="date"></label>
+      <label>类型<select id="r-kind"><option>默写</option><option>功课</option></select></label>
+      <button class="b ghost" data-a="copyTodo">复制未完成名单</button>
+    </div>
+    <div style="margin:8px 0;font-size:.82rem;color:var(--muted)">在补习中心默写或做完功课，老师直接勾选即可，打勾自动保存。表头的“全勾”可一次勾选/取消全班。</div>
+    <div class="scroll"><table id="roster"></table></div>
+    <details style="margin-top:12px">
+      <summary id="roster-sum-title" style="cursor:pointer;font-weight:700;font-size:.9rem">📋 各科未完成名单</summary>
+      <div id="roster-sum" style="margin-top:8px;font-size:.88rem;line-height:1.8"></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>📌 主题名单（作文、专题等）</h2>
+    <div class="row">
+      <label>类型<select id="t-kind"><option>功课</option><option>默写</option></select></label>
+      <label>科目<select id="t-subj"></select></label>
+      <label>主题名称<input id="t-title" maxlength="30" style="width:220px" placeholder="例如：我最敬爱的人"></label>
+      <label>截止日期（选填）<input id="t-due" type="date"></label>
+      <button class="b" data-a="addTopic">添加主题</button>
+    </div>
+    <div class="row" style="margin:12px 0 8px">
+      <label>查看<select id="t-filter"><option value="">全部科目</option></select></label>
+      <button class="b ghost" data-a="copyTopics">复制未完成名单</button>
+    </div>
+    <div style="margin-bottom:8px;font-size:.82rem;color:var(--muted)">主题不按日期计算，学生什么时候交都在同一格勾选。同一科目可以添加多个主题。</div>
+    <div class="scroll"><table id="topic-table"></table></div>
+    <details style="margin-top:12px">
+      <summary id="topic-sum-title" style="cursor:pointer;font-weight:700;font-size:.9rem">📌 各主题未完成名单</summary>
+      <div id="topic-sum" style="margin-top:8px;font-size:.88rem;line-height:1.8"></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>🎁 全班奖励</h2>
+    <div class="row">
+      <label>金币<input id="a-coins" type="number" value="0" min="0"></label>
+      <label>星星<input id="a-stars" type="number" value="0" min="0"></label>
+      <button class="b gold" data-a="awardAll">发放给全班</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>📢 发布公告 / 任务</h2>
+    <div class="row">
+      <label>类型<select id="p-type"><option value="notice">公告</option><option value="homework">功课（可发奖励）</option><option value="task">任务（可发奖励）</option></select></label>
+      <label>科目<select id="p-subj"><option value="">不限科目</option></select></label>
+      <label>标题<input id="p-title" maxlength="40" style="width:220px"></label>
+      <label>奖励金币（仅任务）<input id="p-coins" type="number" value="20" min="0"></label>
+      <label>奖励星星（仅任务）<input id="p-stars" type="number" value="1" min="0"></label>
+    </div>
+    <textarea id="p-body" maxlength="200" aria-label="内容" placeholder="内容（可选）"></textarea>
+    <label style="display:block;margin-top:8px;font-size:.85rem"><input id="p-proof" type="checkbox" checked style="width:auto"> 要求学生提交证明（照片或文字说明）</label>
+    <div style="margin-top:10px;font-size:.85rem;font-weight:700">发布到哪些班级（可多选，每个班各自独立收作业、批准）：</div>
+    <div id="p-classes" style="display:flex;gap:14px;flex-wrap:wrap;margin:6px 0"></div>
+    <div class="row" style="margin:4px 0 8px;align-items:center">
+      <button class="b ghost" data-a="pubAll">全选 / 取消全选所有班级</button>
+      <label style="flex-direction:row;align-items:center;gap:4px;font-weight:600;font-size:.85rem"><input id="p-imp" type="checkbox" style="width:auto"> ⭐ 重要（学生首页置顶并标红）</label>
+    </div>
+    <div style="margin:8px 0 16px"><button class="b" data-a="publish">发布</button></div>
+    <div id="notice-list"></div>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary style="cursor:pointer;font-weight:700;font-size:1.05rem">🏆 封神榜管理（录入考试成绩）</summary>
+      <div style="margin:8px 0;font-size:.85rem;color:var(--muted);line-height:1.6">录入全中心的优秀成绩（包括已毕业的学长学姐），学生在“🏆 封神榜”里能看到各科前十名。<br>只有勾选“公开”的条目学生才看得到，公开显示的是完整姓名，请先征得本人或家长同意。</div>
+      <div class="row">
+        <label>选择学生<select id="h-who"></select></label>
+        <label>姓名<input id="h-name" maxlength="40"></label>
+        <label>班别 / 届别<input id="h-cls" maxlength="30" placeholder="例如：2023 届毕业生"></label>
+        <label>科目<select id="h-subj"></select></label>
+        <label>考试名称<input id="h-exam" maxlength="30" placeholder="例如：2025 年终考试"></label>
+        <label>分数（百分制）<input id="h-score" type="number" min="0" max="100" step="0.01"></label>
+        <label>备注（选填）<input id="h-remark" maxlength="30" placeholder="例如：UPSR 7A"></label>
+      </div>
+      <label style="display:block;margin:8px 0;font-size:.85rem"><input id="h-pub" type="checkbox" style="width:auto"> 已征得本人/家长同意，在学生端公开显示</label>
+      <button class="b" data-a="hofAdd">录入</button>
+      <div class="row" style="margin:14px 0 8px"><label>只看科目<select id="hf-subj"><option value="">全部</option></select></label></div>
+      <div style="font-size:.85rem;margin-bottom:6px">共 <span id="hof-count">0</span> 条（按分数从高到低）</div>
+      <div class="scroll"><table><thead><tr><th>姓名</th><th>班别/届别</th><th>科目</th><th>考试</th><th>分数</th><th>公开</th><th>操作</th></tr></thead><tbody id="hof-rows"></tbody></table></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary style="cursor:pointer;font-weight:700;font-size:1.05rem">🎓 一键升班（新学年用）</summary>
+      <div style="margin:8px 0;font-size:.85rem;color:var(--muted);line-height:1.6">给每个班选择升到哪个班，点“一键升班”后，整班学生一次移过去，学号不变。<br>六年级请升到一个叫“已毕业”的班级（先在管理员的班级管理里建好）。普通老师需要同时负责升入前后两个班，管理员没有这个限制。</div>
+      <div id="promote-list"></div>
+      <button class="b" data-a="promote" style="margin-top:10px">一键升班</button>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>➕ 添加学生</h2>
+    <div class="row">
+      <label>学号（例如 p26001）<input id="n-id" maxlength="20" placeholder="p26001"></label>
+      <label>姓名<input id="n-name" maxlength="40"></label>
+      <label>初始密码<input id="n-pw" type="text" maxlength="30"></label>
+      <button class="b" data-a="add">添加</button>
+    </div>
+    <div style="margin-top:8px;font-size:.82rem;color:var(--muted)">学号规则：p + 入学年份后两位 + 3 位序号。例如 2026 年入读一年级的第 1 位同学是 p26001，一直用到六年级毕业都不用改，系统会自动算出他现在读几年级。</div>
+  </section>
+
+  <section class="card">
+    <h2>📋 学生列表（<span id="count">0</span> 人）</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>姓名 / 学号</th><th>宠物</th><th>金币</th><th>星星</th><th>今日打卡</th><th>操作</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <div id="empty" class="empty" hidden>还没有学生，请先在上方添加。</div>
+  </section>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.100.1/dist/umd/supabase.js"></script>
+<script src="shared.js"></script>
+<script>
+const me = Auth.guard('teacher');
+if (!me) throw new Error('未登录');
+
+const $ = id => document.getElementById(id);
+const el = (t, p = {}, ...k) => { const n = Object.assign(document.createElement(t), p); n.append(...k); return n; };
+let tt; const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2200); };
+// ===== 班级：老师只看到自己负责的班级，下面所有名单都按“当前班级”过滤 =====
+let curClass = '';
+const myUser = () => Auth.users().find(u => u.id === me.id) || me;
+const myClasses = () => { const u = myUser(), all = Auth.classes(); return u.admin ? all : all.filter(c => (u.classIds || []).includes(c.id)); };
+const students = () => Auth.users().filter(u => u.role === 'student' && u.classId === curClass)
+  .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));   // 学生列表和所有名单都按学号排序
+// 从学号算出现在读几年级：学号 = p + 入学年份后两位 + 3位序号（如 p26001 = 2026 年入读一年级）
+const CN = ['一', '二', '三', '四', '五', '六'];
+function gradeOf(code) {
+  const m = /^p(\d{2})\d{3}$/.exec(code);
+  if (!m) return '';
+  const g = new Date().getFullYear() % 100 - Number(m[1]) + 1;
+  return g < 1 ? '尚未入学' : g > 6 ? '已毕业' : `${CN[g - 1]}年级`;
+}
+
+// ===== 一键升班 =====
+let promoteSel = {};                                       // 班级id → 要升到的班级id
+function guessNext(c, cs) {                                // 按名字猜下一个班：二年级→三年级；六年级→名字含“毕业”的班
+  const m = /[一二三四五六]/.exec(c.name);
+  if (!m) return '';
+  const i = CN.indexOf(m[0]);
+  const next = i === 5 ? cs.find(x => x.name.includes('毕业')) : cs.find(x => x.name === c.name.replace(m[0], CN[i + 1]));
+  return next ? next.id : '';
+}
+function renderPromote() {
+  const cs = myClasses(), users = Auth.users(), box = $('promote-list');
+  box.replaceChildren();
+  if (!cs.length) return box.append(el('div', { className: 'empty', textContent: '还没有可用的班级。' }));
+  cs.forEach(c => {
+    const n = users.filter(u => u.role === 'student' && u.classId === c.id).length;
+    if (!(c.id in promoteSel)) promoteSel[c.id] = guessNext(c, cs);
+    const sel = el('select', { ariaLabel: `${c.name} 升到哪个班` });
+    sel.append(new Option('不升班（保持不变）', ''));
+    cs.filter(x => x.id !== c.id).forEach(x => sel.append(new Option(x.name, x.id)));
+    sel.value = promoteSel[c.id] || ''; sel.dataset.from = c.id;
+    box.append(el('div', { style: 'display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap' },
+      el('span', { textContent: `${c.name}（${n} 人）→`, style: 'min-width:160px' }), sel));
+  });
+}
+
+// ===== 封神榜管理 =====
+function renderHall() {
+  const f = $('hf-subj').value, rows = $('hof-rows'); rows.replaceChildren();
+  const list = Auth.hall().filter(e => !f || e.subject === f).sort((a, b) => b.score - a.score);
+  $('hof-count').textContent = list.length;
+  if (!list.length) return rows.append(el('tr', {}, el('td', { colSpan: 7, className: 'empty', textContent: '还没有录入成绩。' })));
+  list.forEach(e => rows.append(el('tr', {},
+    el('td', { textContent: e.name }), el('td', { textContent: e.classLabel }), el('td', { textContent: e.subject }),
+    el('td', { textContent: e.exam }), el('td', { textContent: `${e.score}${e.remark ? '（' + e.remark + '）' : ''}` }),
+    el('td', { textContent: e.isPublic ? '✅ 公开' : '🔒 不公开' }),
+    el('td', { className: 'act' }, btn(e.isPublic ? '取消公开' : '设为公开', 'hofPub', e.id, 'b ghost'), btn('删除', 'hofDel', e.id, 'b red')))));
+}
+function renderHofWho() {                                  // “选择学生”下拉：当前班级的学生（毕业生选第一项，手动填姓名）
+  const sel = $('h-who'), keep = sel.value;
+  sel.replaceChildren(new Option('（手动输入姓名，如毕业生）', ''));
+  students().forEach(u => sel.append(new Option(`${u.name}（${u.id}）`, u.id)));
+  sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
+}
+
+function renderClassSelect() {
+  const cs = myClasses(), sel = $('cls');
+  if (!cs.some(c => c.id === curClass)) curClass = cs[0]?.id || '';
+  sel.replaceChildren(...(cs.length ? cs.map(c => new Option(c.name, c.id)) : [new Option('（暂无班级）', '')]));
+  sel.value = curClass;
+}
+let pubSel = null;                                         // 发布目标班级；null = 默认只发给当前班级
+function renderPubTargets() {
+  const box = $('p-classes'), cs = myClasses(); box.replaceChildren();
+  const sel = pubSel ? [...pubSel] : [curClass];
+  cs.forEach(c => {
+    const cb = el('input', { type: 'checkbox', className: 'chk', checked: sel.includes(c.id) });
+    cb.dataset.pc = c.id;
+    box.append(el('label', { style: 'display:flex;gap:4px;align-items:center;font-size:.88rem' }, cb, c.name));
+  });
+  if (!cs.length) box.append(el('span', { className: 'empty', textContent: '还没有可用的班级' }));
+}
+const curClassName = () => Auth.classes().find(c => c.id === curClass)?.name || '';
+function renderAdmin() {
+  const card = $('admin-card'), u = myUser(); card.hidden = !u.admin;
+  if (!u.admin) return;
+  const cls = Auth.classes(), users = Auth.users();
+  $('class-list').replaceChildren(...(cls.length ? cls.map(c => el('div', { style: 'display:flex;gap:8px;align-items:center;margin:4px 0' },
+    el('span', { textContent: `🏫 ${c.name}（${users.filter(x => x.role === 'student' && x.classId === c.id).length} 名学生）` }),
+    btn('删除', 'delClass', c.id, 'b red'))) : [el('div', { className: 'empty', textContent: '还没有班级，请先添加。' })]));
+  $('teacher-list').replaceChildren(...users.filter(x => x.role === 'teacher').map(t => {
+    const boxes = el('div', { style: 'display:flex;gap:14px;flex-wrap:wrap;margin:4px 0' });
+    cls.forEach(c => {
+      const cb = el('input', { type: 'checkbox', className: 'chk', checked: !!t.admin || (t.classIds || []).includes(c.id), disabled: !!t.admin });
+      cb.dataset.ac = c.id; cb.dataset.au = t.id;
+      boxes.append(el('label', { style: 'display:flex;gap:4px;align-items:center' }, cb, c.name));
+    });
+    return el('div', { style: 'border-top:1px dashed var(--border);padding:8px 0;font-size:.88rem' },
+      el('div', { textContent: `${t.name}（${t.id}）${t.admin ? ' · 管理员' : ''}`, style: 'font-weight:700' }), boxes,
+      el('div', { style: 'display:flex;gap:6px' }, btn('编辑', 'edit', t.id, 'b ghost'), btn('重置密码', 'reset', t.id, 'b ghost'), ...(t.admin ? [] : [btn('删除老师', 'delTeacher', t.id, 'b red')])));
+  }));
+}
+const today = () => new Date().toLocaleDateString('sv');
+const PETS = ['未孵化 🥚', 'Lv.1', 'Lv.2', 'Lv.3 👑'];
+
+// 发放金币/星星：写入“奖励记录”，学生下次打开游戏页面时自动领取（不会和学生的存档互相覆盖）
+function award(id, c, s, note) { Auth.grant(id, c, s, note || ''); }
+const askNum = msg => { const n = parseInt(prompt(msg), 10); return Number.isFinite(n) ? n : null; };
+const btn = (text, a, id, cls = 'b') => { const b = el('button', { className: cls, textContent: text }); b.dataset.a = a; if (id) b.dataset.id = id; return b; };
+
+// 当前班级没有学生时的提示（带上班级名，避免以为是数据丢了）
+const emptyMsg = () => {
+  const c = Auth.classes().find(x => x.id === curClass);
+  return c ? `「${c.name}」还没有学生，请在下方添加，或在学生列表里用“转班”把学生转进来。` : '还没有可用的班级，请让管理员先创建班级。';
+};
+
+// ===== 默写 / 功课名单 =====
+const rState = () => ({ d: $('r-date').value || today(), k: $('r-kind').value });
+const rKey = (d, k, s) => `${d}|${k}|${s}`;
+function renderRoster() {
+  const { d, k } = rState(), stu = students(), recs = Auth.records(), tb = $('roster');
+  tb.replaceChildren(); $('roster-sum').replaceChildren(); $('roster-sum-title').textContent = '📋 各科未完成名单';
+  if (!stu.length) return tb.append(el('caption', { className: 'empty', textContent: emptyMsg() }));
+  tb.append(el('thead', {}, el('tr', {}, el('th', { textContent: '学生' }),
+    ...Auth.SUBJECTS.map(s => el('th', {}, el('div', { textContent: s }), btn('全勾', 'allsubj', s, 'b ghost'))))));
+  const body = el('tbody');
+  stu.forEach(u => body.append(el('tr', {}, el('td', { textContent: u.name }), ...Auth.SUBJECTS.map(s => {
+    const c = el('input', { type: 'checkbox', className: 'chk', checked: (recs[rKey(d, k, s)] || []).includes(u.id) });
+    c.dataset.sid = u.id; c.dataset.subj = s; c.setAttribute('aria-label', `${u.name} ${s}${k}`);
+    return el('td', {}, c);
+  }))));
+  tb.append(body); renderSum();
+}
+function renderSum() {
+  const { d, k } = rState(), stu = students(), recs = Auth.records(), box = $('roster-sum');
+  box.replaceChildren();
+  let left = 0;
+  Auth.SUBJECTS.forEach(s => {
+    const done = recs[rKey(d, k, s)] || [], todo = stu.filter(u => !done.includes(u.id));
+    left += todo.length;
+    box.append(el('div', {}, el('b', { textContent: `${s}${k}：` }), `已完成 ${stu.length - todo.length}/${stu.length}　`,
+      el('span', { textContent: todo.length ? `未完成：${todo.map(u => u.name).join('、')}` : '✅ 全部完成', style: todo.length ? 'color:#c22' : 'color:var(--ok)' })));
+  });
+  $('roster-sum-title').textContent = `📋 各科未完成名单（${left ? `共 ${left} 项未完成` : '全部完成 ✅'}）`;
+}
+
+// ===== 主题名单 =====
+const topicList = () => { const f = $('t-filter').value; return Auth.topics().filter(t => t.classId === curClass && (!f || t.subject === f)); };
+function renderTopics() {
+  const stu = students(), list = topicList(), tb = $('topic-table');
+  tb.replaceChildren(); $('topic-sum').replaceChildren(); $('topic-sum-title').textContent = '📌 各主题未完成名单';
+  if (!list.length) return tb.append(el('caption', { className: 'empty', textContent: '还没有主题，请先在上方添加。' }));
+  if (!stu.length) return tb.append(el('caption', { className: 'empty', textContent: emptyMsg() }));
+  tb.append(el('thead', {}, el('tr', {}, el('th', { textContent: '学生' }), ...list.map(t => el('th', {},
+    el('div', { textContent: t.title, style: 'font-weight:700' }),
+    el('div', { textContent: `${t.subject}·${t.kind}${t.due ? '·' + t.due.slice(5) + '截止' : ''}`, style: 'font-size:.7rem;color:var(--muted)' }),
+    btn('全勾', 'allTopic', t.id, 'b ghost'), btn('删除', 'delTopic', t.id, 'b red'))))));
+  const body = el('tbody');
+  stu.forEach(u => body.append(el('tr', {}, el('td', { textContent: u.name }), ...list.map(t => {
+    const c = el('input', { type: 'checkbox', className: 'chk', checked: t.done.includes(u.id) });
+    c.dataset.tid = t.id; c.dataset.tsid = u.id; c.setAttribute('aria-label', `${u.name} ${t.title}`);
+    return el('td', {}, c);
+  }))));
+  tb.append(body); renderTopicSum();
+}
+function renderTopicSum() {
+  const stu = students(), box = $('topic-sum'); box.replaceChildren();
+  let left = 0;
+  const list = topicList();
+  list.forEach(t => {
+    const todo = stu.filter(u => !t.done.includes(u.id)), late = todo.length && t.due && t.due < today();
+    left += todo.length;
+    box.append(el('div', {}, el('b', { textContent: `${t.subject}「${t.title}」：` }), `已完成 ${stu.length - todo.length}/${stu.length}　`,
+      el('span', { textContent: todo.length ? `未完成：${todo.map(u => u.name).join('、')}${late ? '　⚠️已过截止' : ''}` : '✅ 全部完成', style: todo.length ? 'color:#c22' : 'color:var(--ok)' })));
+  });
+  $('topic-sum-title').textContent = `📌 各主题未完成名单${list.length ? `（${left ? `共 ${left} 项未完成` : '全部完成 ✅'}）` : ''}`;
+}
+
+function renderNotices() {
+  const box = $('notice-list'); box.replaceChildren();
+  const stu = students(), all = Auth.notices().filter(n => n.classId === curClass);
+  box.append(el('div', { textContent: `「${curClassName()}」已发布的内容`, style: 'font-weight:700;margin:6px 0' }));
+  if (!all.length) return box.append(el('div', { className: 'empty', textContent: '还没有发布过内容。' }));
+  all.forEach(n => {
+    const kids = [
+      el('div', { style: 'display:flex;justify-content:space-between;gap:8px;align-items:center' },
+        el('b', { textContent: `${n.important ? '⭐重要 ' : ''}${Auth.KIND[n.type] || '🎯 任务'}${n.subject ? '｜' + n.subject : ''}：${n.title}` }), btn('删除', 'delnotice', n.id, 'b red')),
+      el('div', { textContent: n.body || '（无内容）', style: 'margin:4px 0;color:var(--muted);font-size:.85rem' })
+    ];
+    if (n.type !== 'notice') {
+      const st = id => Auth.sub(n, id)?.status;
+      const count = k => stu.filter(u => st(u.id) === k).length, todo = stu.filter(u => !st(u.id) || st(u.id) === 'rejected');
+      kids.push(el('div', { textContent: `奖励：${n.coins}🪙 ${n.stars}⭐　已完成 ${count('done')}　待批准 ${count('pending')}　已退回 ${count('rejected')}　${n.needProof ? '需证明' : '无需证明'}`, style: 'font-size:.85rem' }));
+      kids.push(el('div', { textContent: `未提交（${todo.length}）：${todo.map(u => u.name).join('、') || '无'}`, style: 'font-size:.85rem;color:#c22;margin-top:2px' }));
+      stu.filter(u => st(u.id) === 'pending').forEach(u => {
+        const sb = Auth.sub(n, u.id), photo = sb.photo;
+        const row = el('div', { style: 'border-top:1px dashed var(--border);margin-top:8px;padding-top:8px;font-size:.88rem' },
+          el('div', { textContent: `${u.name} 已提交（${new Date(sb.time || Date.now()).toLocaleString('zh-CN')}）` }),
+          el('div', { textContent: sb.note ? `说明：${sb.note}` : '（没有文字说明）', style: 'margin:2px 0;color:var(--muted)' }));
+        if (photo) {
+          const img = el('img', { alt: `${u.name} 的证明照片`, style: 'max-width:140px;border-radius:8px;cursor:zoom-in;display:block;margin:4px 0' });
+          img.onclick = () => { img.style.maxWidth = img.style.maxWidth === '100%' ? '140px' : '100%'; };   // 点击放大/缩小
+          Auth.proofUrl(n.id, u.id).then(url => { if (url) img.src = url; });   // 照片在私有存储里，取临时链接
+          row.append(img);
+        }
+        row.append(el('div', { style: 'display:flex;gap:6px;margin-top:6px' },
+          btn('批准并发奖', 'approve', `${n.id}|${u.id}`, 'b gold'), btn('退回', 'reject', `${n.id}|${u.id}`, 'b ghost')));
+        kids.push(row);
+      });
+    }
+    box.append(el('div', { style: 'border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px' }, ...kids));
+  });
+}
+
+function render() {
+  renderClassSelect(); renderAdmin(); renderPubTargets(); renderPromote(); renderHall(); renderHofWho();
+  renderNotices(); renderRoster(); renderTopics();
+  const list = students(), body = $('rows'); body.replaceChildren();
+  $('count').textContent = list.length; $('empty').hidden = list.length > 0;
+  list.forEach(u => {
+    const d = Auth.loadSave(u.id) || {}, pa = Auth.pendingAward(u.id);
+    const done = d.date === today() ? (d.completed || []).length : 0;
+    body.append(el('tr', {},
+      el('td', { textContent: `${u.name}（${u.id}${gradeOf(u.id) ? '·' + gradeOf(u.id) : ''}）` }),
+      el('td', { textContent: PETS[d.petLevel || 0] || '-' }),
+      el('td', { textContent: `${d.coins ?? Auth.START.coins}${pa && pa.coins ? `（待领 ${pa.coins > 0 ? '+' : ''}${pa.coins}）` : ''}` }),
+      el('td', { textContent: `${d.stars ?? Auth.START.stars}${pa && pa.stars ? `（待领 ${pa.stars > 0 ? '+' : ''}${pa.stars}）` : ''}` }),
+      el('td', { textContent: `${done} / 5` }),
+      el('td', { className: 'act' },
+        btn('+金币', 'coin', u.id, 'b gold'), btn('+星星', 'star', u.id, 'b gold'),
+        btn('编辑', 'edit', u.id, 'b ghost'), btn('转班', 'move', u.id, 'b ghost'), btn('重置密码', 'reset', u.id, 'b ghost'), btn('删除', 'del', u.id, 'b red'))));
+  });
+}
+
+const A = {
+  logout: Auth.logout,
+  coin(id) { const n = askNum('发放多少金币？（负数为扣除）'); if (n) { award(id, n, 0); render(); toast('已更新金币'); } },
+  star(id) { const n = askNum('发放多少星星？（负数为扣除）'); if (n) { award(id, 0, n); render(); toast('已更新星星'); } },
+  awardAll() {
+    const c = parseInt($('a-coins').value, 10) || 0, s = parseInt($('a-stars').value, 10) || 0, list = students();
+    if (!list.length || (!c && !s)) return toast('请先填写奖励数量');
+    list.forEach(u => award(u.id, c, s)); render(); toast(`已发放给 ${list.length} 位学生`);
+  },
+  async add() {
+    const id = $('n-id').value.trim(), name = $('n-name').value.trim(), pw = $('n-pw').value;
+    if (!/^[A-Za-z0-9_-]{2,20}$/.test(id)) return toast('学号只能是 2-20 位字母、数字、- 或 _');
+    if (!name) return toast('请填写姓名');
+    if (pw.length < 6) return toast('密码至少 6 位');
+    if (!curClass) return toast('请先选择班级（没有班级请让管理员先创建）');
+    if (!/^p\d{5}$/.test(id.toLowerCase()) && !confirm('学号不是推荐格式：p + 入学年份后两位 + 3 位序号（例如 p26001）。\n仍然用这个学号添加吗？')) return;
+    try { await Auth.call('createStudent', { code: id, name, password: pw, classId: curClass }); }
+    catch (e) { return toast('添加失败：' + e.message); }
+    ['n-id', 'n-name', 'n-pw'].forEach(i => $(i).value = ''); render(); toast(`已添加 ${name}（学号会统一转成小写）`);
+  },
+  async hofAdd() {
+    const who = $('h-who').value, name = $('h-name').value.trim(), score = parseFloat($('h-score').value);
+    if (!name) return toast('请填写姓名');
+    if (!(score >= 0 && score <= 100)) return toast('分数请填 0 到 100 之间的数字');
+    const stu = who ? Auth.users().find(u => u.id === who) : null;
+    try {
+      await Auth.addHall({ name, student_id: stu ? stu.uid : null, class_label: $('h-cls').value.trim(), subject: $('h-subj').value,
+        exam: $('h-exam').value.trim(), score, remark: $('h-remark').value.trim(), is_public: $('h-pub').checked });
+    } catch (e) { return toast('录入失败：' + e.message); }
+    ['h-score', 'h-remark'].forEach(i => $(i).value = ''); render(); toast('已录入');
+  },
+  async hofPub(id) {
+    const e = Auth.hall().find(x => x.id === id);
+    if (!e) return;
+    try { await Auth.setHallPublic(id, !e.isPublic); } catch (err) { return toast('操作失败：' + err.message); }
+    if (Auth.hall().find(x => x.id === id)?.isPublic === e.isPublic) return toast('只能修改自己录入的条目（管理员除外）');
+    render();
+  },
+  async hofDel(id) {
+    const e = Auth.hall().find(x => x.id === id);
+    if (!e || !confirm(`确定删除 ${e.name} 的这条成绩？`)) return;
+    try { await Auth.delHall(id); } catch (err) { return toast('删除失败：' + err.message); }
+    if (Auth.hall().some(x => x.id === id)) return toast('只能删除自己录入的条目（管理员除外）');
+    render(); toast('已删除');
+  },
+  async edit(id) {                                         // 修改姓名 / 学号
+    const u = Auth.users().find(x => x.id === id);
+    if (!u) return;
+    const name = prompt('姓名（最多 40 个字）', u.name);
+    if (name === null) return;
+    const code = prompt('学号 / 登录账号（改了以后要用新的登录）\n推荐格式：p + 入学年份后两位 + 3 位序号，例如 p26001', u.id);
+    if (code === null) return;
+    const n = name.trim(), c = code.trim().toLowerCase();
+    if (!n) return toast('姓名不能为空');
+    if (n === u.name && c === u.id) return;
+    if (c !== u.id && u.role === 'student' && !/^p\d{5}$/.test(c) && !confirm('学号不是推荐格式：p + 入学年份后两位 + 3 位序号（例如 p26001）。\n仍然改成这个吗？')) return;
+    try { await Auth.call('updateUser', { code: u.id, name: n, newCode: c }); } catch (e) { return toast('修改失败：' + e.message); }
+    if (u.id === me.id && c !== u.id) { alert('你的登录账号已改成 ' + c + '，请用新账号重新登录。'); return Auth.logout(); }
+    render(); toast('已修改');
+  },
+  async promote() {
+    const users = Auth.users(), cs = myClasses(), groups = {}, lines = [];
+    let total = 0;
+    cs.forEach(c => {
+      const to = promoteSel[c.id];
+      if (!to || to === c.id) return;
+      const uids = users.filter(u => u.role === 'student' && u.classId === c.id).map(u => u.uid);
+      if (!uids.length) return;
+      (groups[to] ||= []).push(...uids); total += uids.length;
+      lines.push(`${c.name}（${uids.length} 人）→ ${cs.find(x => x.id === to).name}`);
+    });
+    if (!total) return toast('没有需要升班的学生（请先给班级选择要升到的班）');
+    if (!confirm(`确定一键升班吗？共 ${total} 人：\n${lines.join('\n')}\n\n这一步会立刻生效，之后可以用“转班”逐个调整。`)) return;
+    let done;
+    try { done = await Auth.promote(Object.entries(groups).map(([to, uids]) => ({ to, uids }))); }
+    catch (e) { return toast('升班失败：' + e.message + '（提示权限不足，说明你没有同时负责升入的班级）'); }
+    promoteSel = {}; render();
+    toast(done === total ? `已升班 ${total} 人` : `已升班 ${done} 人（另有 ${total - done} 人没有权限，已跳过）`);
+  },
+  async move(id) {                                               // 把学生转到另一个班
+    const cs = myClasses(), u = Auth.users().find(x => x.id === id);
+    const n = parseInt(prompt(`把 ${u.name} 转到哪个班？输入编号：\n` + cs.map((c, i) => `${i + 1}. ${c.name}`).join('\n')), 10);
+    if (!cs[n - 1]) return;
+    try { await Auth.moveStudent(u.uid, cs[n - 1].id); } catch (e) { return toast('转班失败：' + e.message); }
+    render(); toast(`已转到 ${cs[n - 1].name}`);
+  },
+  async addClass() {
+    const name = $('c-name').value.trim();
+    if (!name) return toast('请填写班级名称');
+    try { await Auth.addClass(name); } catch (e) { return toast('添加失败：' + e.message); }
+    $('c-name').value = ''; render(); toast(`已添加 ${name}`);
+  },
+  async delClass(id) {
+    const c = Auth.classes().find(x => x.id === id);
+    if (Auth.users().some(u => u.role === 'student' && u.classId === id)) return toast('这个班还有学生，请先把学生转到别的班');
+    if (!c || !confirm(`确定删除班级 ${c.name}？`)) return;
+    try { await Auth.delClass(id); } catch (e) { return toast('删除失败：' + e.message); }
+    render();
+  },
+  async addTeacher() {
+    const id = $('tc-id').value.trim(), name = $('tc-name').value.trim(), pw = $('tc-pw').value;
+    if (!/^[A-Za-z0-9_-]{2,20}$/.test(id)) return toast('账号只能是 2-20 位字母、数字、- 或 _');
+    if (!name) return toast('请填写姓名');
+    if (pw.length < 6) return toast('老师密码至少 6 位');
+    try { await Auth.call('createTeacher', { code: id, name, password: pw }); }
+    catch (e) { return toast('添加失败：' + e.message); }
+    ['tc-id', 'tc-name', 'tc-pw'].forEach(i => $(i).value = ''); render(); toast(`已添加老师 ${name}，请勾选负责的班级`);
+  },
+  async delTeacher(id) {
+    const t = Auth.users().find(x => x.id === id);
+    if (!t || t.admin || !confirm(`确定删除老师 ${t.name}（${id}）？`)) return;
+    try { await Auth.call('deleteUser', { code: id }); } catch (e) { return toast('删除失败：' + e.message); }
+    render(); toast('已删除');
+  },
+  async reset(id) {
+    const pw = prompt('输入新密码（至少 6 位）');
+    if (pw === null) return;
+    if (pw.length < 6) return toast('密码至少 6 位');
+    try { await Auth.call('resetPassword', { code: id, password: pw }); } catch (e) { return toast('重置失败：' + e.message); }
+    toast('密码已重置');
+  },
+  async del(id) {
+    const u = Auth.users().find(x => x.id === id);
+    if (!confirm(`确定删除 ${u.name}（${id}）？该学生的账号会被删除，无法恢复。`)) return;
+    try { await Auth.call('deleteUser', { code: id }); } catch (e) { return toast('删除失败：' + e.message); }
+    localStorage.removeItem(Auth.saveKey(id)); render(); toast('已删除');
+  },
+  publish() {
+    const type = $('p-type').value, task = type !== 'notice', title = $('p-title').value.trim();
+    const ids = [...document.querySelectorAll('[data-pc]:checked')].map(x => x.dataset.pc);
+    if (!title) return toast('请填写标题');
+    if (!ids.length) return toast('请至少选择一个班级');
+    const n = Auth.notices(), t0 = Date.now();
+    ids.reverse().forEach((cid, i) => n.unshift({                 // 每个班一份独立的公告/任务
+      id: crypto.randomUUID(), batch: 'b' + t0, important: $('p-imp').checked, classId: cid, type, subject: $('p-subj').value,
+      needProof: task && $('p-proof').checked, title, body: $('p-body').value.trim(),
+      coins: task ? Math.max(0, parseInt($('p-coins').value, 10) || 0) : 0,
+      stars: task ? Math.max(0, parseInt($('p-stars').value, 10) || 0) : 0, date: today(), subs: {} }));
+    Auth.saveNotices(n); ['p-title', 'p-body'].forEach(i => $(i).value = ''); $('p-imp').checked = false; render();
+    toast(`已发布给 ${ids.length} 个班级`);
+  },
+  pubAll() {                                               // 一键选中（或取消）所有可发布的班级
+    const boxes = [...document.querySelectorAll('[data-pc]')], all = boxes.every(b => b.checked);
+    boxes.forEach(b => b.checked = !all);
+    pubSel = new Set(boxes.filter(b => b.checked).map(b => b.dataset.pc));
+  },
+  delnotice(id) {
+    if (!confirm('确定删除这一条？')) return;
+    const all = Auth.notices(), n = all.find(x => x.id === id);
+    if (!n) return;
+    const same = n.batch ? all.filter(x => x.batch === n.batch && x.id !== id) : [];   // 同一次发布的其他班
+    const both = same.length && confirm(`这条还同时发给了另外 ${same.length} 个班。\n点“确定”一起删除，点“取消”只删除本班这一条。`);
+    const gone = new Set([id, ...(both ? same.map(x => x.id) : [])]);
+    all.filter(x => gone.has(x.id)).forEach(x => Object.keys(x.subs).forEach(sid => Auth.delProof(x.id, sid)));
+    Auth.saveNotices(all.filter(x => !gone.has(x.id))); render();
+  },
+  approve(id) {                                            // id = 公告id|学号
+    const [nid, sid] = id.split('|'), all = Auth.notices(), n = all.find(x => x.id === nid);
+    if (!n || Auth.sub(n, sid)?.status !== 'pending') return;
+    n.subs[sid] = { ...Auth.sub(n, sid), status: 'done' }; Auth.saveNotices(all); award(sid, n.coins, n.stars); render(); toast('已批准并发放奖励');
+  },
+  addTopic() {
+    const title = $('t-title').value.trim();
+    if (!title) return toast('请填写主题名称');
+    const all = Auth.topics();
+    all.push({ id: crypto.randomUUID(), classId: curClass, kind: $('t-kind').value, subject: $('t-subj').value, title, due: $('t-due').value, done: [] });
+    Auth.saveTopics(all); $('t-title').value = ''; $('t-due').value = ''; renderTopics(); toast('已添加主题');
+  },
+  allTopic(id) {                                           // 该主题：全班一键勾选；已全勾则取消
+    const all = Auth.topics(), t = all.find(x => x.id === id), ids = students().map(u => u.id);
+    if (!t) return;
+    t.done = ids.every(i => t.done.includes(i)) ? [] : ids; Auth.saveTopics(all); renderTopics();
+  },
+  delTopic(id) {
+    const t = Auth.topics().find(x => x.id === id);
+    if (!t || !confirm(`确定删除主题「${t.title}」？勾选记录也会一起删除。`)) return;
+    Auth.saveTopics(Auth.topics().filter(x => x.id !== id)); renderTopics();
+  },
+  copyTopics() {
+    const stu = students();
+    const lines = topicList().map(t => {
+      const todo = stu.filter(u => !t.done.includes(u.id));
+      return todo.length ? `${t.subject}「${t.title}」未完成：${todo.map(u => u.name).join('、')}` : null;
+    }).filter(Boolean);
+    navigator.clipboard?.writeText(lines.join('\n') || '所有主题都已完成 ✅')
+      .then(() => toast('已复制未完成名单'), () => toast('复制失败，请手动选取页面上的文字'));
+  },
+  allsubj(s) {                                             // 该科目：全班一键勾选；已全勾则取消
+    const { d, k } = rState(), all = Auth.records(), key = rKey(d, k, s), ids = students().map(u => u.id);
+    all[key] = ids.every(id => (all[key] || []).includes(id)) ? [] : ids;
+    Auth.saveRecords(all); renderRoster();
+  },
+  copyTodo() {                                             // 复制成文字，方便发给家长或同事
+    const { d, k } = rState(), recs = Auth.records(), stu = students();
+    const lines = Auth.SUBJECTS.map(s => {
+      const done = recs[rKey(d, k, s)] || [], todo = stu.filter(u => !done.includes(u.id));
+      return todo.length ? `${s}${k}未完成：${todo.map(u => u.name).join('、')}` : null;
+    }).filter(Boolean);
+    const text = `${d} ${k}名单\n` + (lines.join('\n') || '全部完成 ✅');
+    navigator.clipboard?.writeText(text).then(() => toast('已复制未完成名单'), () => toast('复制失败，请手动选取页面上的文字'));
+  },
+  reject(id) {
+    const [nid, sid] = id.split('|'), all = Auth.notices(), n = all.find(x => x.id === nid);
+    if (!n || Auth.sub(n, sid)?.status !== 'pending') return;
+    const reply = prompt('退回原因（学生会看到）', '请补充清楚一点再提交');
+    if (reply === null) return;
+    n.subs[sid] = { ...Auth.sub(n, sid), status: 'rejected', reply: reply.trim() };
+    Auth.saveNotices(all); render(); toast('已退回，学生可以重新提交');
+  },
+  async mypw() {
+    const pw = prompt('输入新的老师密码（至少 6 位）');
+    if (pw === null) return;
+    if (pw.length < 6) return toast('老师密码至少 6 位');
+    try { await Auth.changeMyPassword(pw); } catch (e) { return toast('修改失败：' + e.message); }
+    toast('密码已修改');
+  }
+};
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-a]');
+  if (t) A[t.dataset.a]?.(t.dataset.id);
+});
+window.addEventListener('storage', render);               // 学生在别的标签页打卡时，这里自动刷新
+
+$('me').textContent = me.name;
+$('r-date').value = today(); $('r-date').onchange = async () => { await Auth.loadDay(rState().d); renderRoster(); };   // 切换日期时载入那天的记录
+$('r-kind').onchange = renderRoster;
+Auth.SUBJECTS.forEach(x => { $('t-subj').append(new Option(x, x)); $('t-filter').append(new Option(x, x)); });
+['总分', ...Auth.SUBJECTS].forEach(x => { $('h-subj').append(new Option(x, x)); $('hf-subj').append(new Option(x, x)); });
+$('hf-subj').onchange = renderHall;
+$('h-who').onchange = () => {                              // 选了在校学生就自动填姓名和班别
+  const u = Auth.users().find(x => x.id === $('h-who').value);
+  if (u) { $('h-name').value = u.name; $('h-cls').value = curClassName(); }
+};
+$('t-filter').onchange = renderTopics;
+document.addEventListener('change', e => {                 // 主题名单：勾选自动保存
+  const c = e.target.closest('[data-tid]');
+  if (!c) return;
+  const all = Auth.topics(), t = all.find(x => x.id === c.dataset.tid);
+  if (!t) return;
+  const set = new Set(t.done); c.checked ? set.add(c.dataset.tsid) : set.delete(c.dataset.tsid);
+  t.done = [...set]; Auth.saveTopics(all); renderTopicSum();
+});
+document.addEventListener('change', e => {                 // 勾选/取消勾选，自动保存
+  const c = e.target.closest('[data-sid]');
+  if (!c) return;
+  const { d, k } = rState(), all = Auth.records(), key = rKey(d, k, c.dataset.subj), set = new Set(all[key] || []);
+  c.checked ? set.add(c.dataset.sid) : set.delete(c.dataset.sid);
+  all[key] = [...set]; Auth.saveRecords(all); renderSum();
+});
+Auth.SUBJECTS.forEach(x => $('p-subj').append(new Option(x, x)));
+$('cls').onchange = () => { curClass = $('cls').value; pubSel = null; render(); };
+document.addEventListener('change', e => {                 // 记住每个班选的升班目标
+  const sel = e.target.closest('[data-from]');
+  if (sel) promoteSel[sel.dataset.from] = sel.value;
+});
+document.addEventListener('change', e => {                 // 记住发布目标班级的勾选
+  if (!e.target.closest('[data-pc]')) return;
+  pubSel = new Set([...document.querySelectorAll('[data-pc]:checked')].map(x => x.dataset.pc));
+});
+document.addEventListener('change', async e => {           // 管理员勾选老师负责的班级
+  const c = e.target.closest('[data-ac]');
+  if (!c) return;
+  const t = Auth.users().find(x => x.id === c.dataset.au);
+  if (!t) return;
+  try { await Auth.setTeacherClass(t.uid, c.dataset.ac, c.checked); toast('已保存'); }
+  catch (err) { c.checked = !c.checked; toast('保存失败：' + err.message); }
+});
+Auth.ready.then(render);
+setInterval(() => { if (!document.hidden && !Auth.busy()) Auth.refresh().then(render).catch(() => {}); }, 30000);   // 每 30 秒同步一次最新数据
+</script>
+</body>
+</html>
