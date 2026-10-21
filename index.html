@@ -86,8 +86,9 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
         </div>
         <div class="card">
           <div class="card-title">TODAY'S MISSION</div>
-          <div class="card-heading">五科学习打卡 🎯</div>
+          <div class="card-heading">五科学习签到 🎯</div>
           <div id="subjects-container"></div>
+          <div class="hint" style="margin-top:6px">签到由老师在补习中心帮你签，每签一科自动获得 10🪙 + 1⭐，在家不能自己签哦。</div>
         </div>
       </div>
       <div>
@@ -149,7 +150,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
   <div id="tab-hof" class="section-view" role="tabpanel">
     <div class="card">
       <div class="card-title">HALL OF FAME</div>
-      <div class="card-heading">🏆 封神榜：名人教育中心历届最强前十名</div>
+      <div class="card-heading">🏆 封神榜：补习中心历届最强前十名</div>
       <div class="hint" style="margin-bottom:10px">从学长学姐到现在的你们，各科成绩最好的前十名。你的目标：把自己的名字写上去！</div>
       <div id="hof-box"></div>
     </div>
@@ -160,15 +161,28 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
       <div class="card">
         <div class="card-title">MESSAGE WALL</div>
         <div class="card-heading">留言墙与鼓励 💬</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+          <label for="msg-scope" style="font-size:.8rem;font-weight:700">发给</label>
+          <select id="msg-scope" style="padding:6px 8px;border-radius:8px;border:1px solid var(--border)">
+            <option value="class">同班同学</option>
+            <option value="all">全部班级</option>
+          </select>
+        </div>
         <textarea id="msg-input" maxlength="200" aria-label="留言内容" placeholder="写下你的学习心得，或给同学的鼓励..."></textarea>
         <button class="btn-action" data-action="post">发布留言</button>
         <div id="msg-list" style="margin-top:12px;font-size:.85rem"></div>
       </div>
       <div class="card">
         <div class="card-title">FRIENDS</div>
-        <div class="card-heading">好友排行榜与送礼 🎁</div>
+        <div class="card-heading">好友与排行榜 🎁</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="fr-code" maxlength="20" placeholder="输入同学的学号，例如 p26001" aria-label="好友学号" style="flex:1;min-width:0;padding:8px;border:1px solid var(--border);border-radius:8px">
+          <button class="btn-action" data-action="addFriend">加好友</button>
+        </div>
+        <div id="fr-req"></div>
+        <div class="card-title" style="margin-top:8px">好友战力排行榜</div>
         <div id="rank-list"></div>
-        <div class="hint" style="margin-top:8px">排行榜中的同学为演示数据（真实好友需要后端），送礼暂无实际效果。</div>
+        <div class="hint" style="margin-top:8px">每位好友每天可以送 1 次礼物，每天最多送 3 位，对方会收到 5 枚金币。好友的战力在对方打开游戏时更新。</div>
       </div>
     </div>
   </div>
@@ -248,7 +262,6 @@ const POOL = [
 // 分解重复装备获得的金币（期望值低于抽奖成本，避免刷金币）
 const SELL = { 稀有: 10, 史诗: 25, 传说: 60 };
 const PET_BASE = [0, 50, 120, 250];
-const NPC = [{ name: '同学 A', power: 260 }, { name: '同学 B', power: 180 }, { name: '同学 C', power: 90 }]; // 演示用
 // 互动：每日次数上限、对话
 const LIMITS = { feed: 3, play: 3, pat: 5 };
 const SAYS = {
@@ -273,10 +286,11 @@ function load(remote) {                                   // remote：云端存�
   p.mood = Math.max(0, p.mood - h * 3); p.tick += h * 36e5;
   if (p.day !== today()) { p.day = today(); p.feed = p.play = p.pat = 0; }
 }
-let synced = false;                                        // 云端存档读取完成后才允许上传，避免旧数据覆盖云端
+let synced = false;
+const pushSave = now => Auth.pushMySave(state, now, { power: calcPower(), pet_level: state.petLevel });   // 战力一起上传，好友排行榜用                                        // 云端存档读取完成后才允许上传，避免旧数据覆盖云端
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch {}
-  if (synced) Auth.pushMySave(state);
+  if (synced) pushSave(false);
 }
 
 // ===== 工具 =====
@@ -301,7 +315,7 @@ const closeModals = () => document.querySelectorAll('.modal-overlay').forEach(m 
 function render() {
   $('coins').textContent = state.coins;
   $('stars').textContent = state.stars;
-  renderPet(); renderCare(); renderRank(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
+  renderPet(); renderCare(); renderRank(); renderMessages(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
   save();
 }
 const gearPower = it => it ? (POOL.find(p => p.name === it.name)?.power ?? 0) : 0;
@@ -320,11 +334,22 @@ function renderCare() {
     const b = $('btn-' + k); b.textContent = `${t} ${p[k]}/${LIMITS[k]}`; b.disabled = p[k] >= LIMITS[k];
   });
 }
-function renderRank() {
-  const rows = [...NPC, { name: me.name + '（我）', power: calcPower(), me: true }].sort((a, b) => b.power - a.power);
+function renderRank() {                                    // 好友战力排行榜 + 好友申请
+  const fr = Auth.friends();
+  const rows = [{ name: me.name + '（我）', power: calcPower(), me: true },
+    ...fr.filter(f => f.status === 'accepted').map(f => ({ name: f.name, cls: f.className, power: f.power, id: f.id, other: f.otherId, gifted: f.giftedToday }))
+  ].sort((a, b) => b.power - a.power);
   $('rank-list').replaceChildren(...rows.map((r, i) => el('div', { className: 'rank-item', style: r.me ? 'background:#eeeaff;border-radius:8px' : '' },
-    el('span', { textContent: `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name}（战力: ${r.power}）` }),
-    r.me ? '' : btn('送礼物', 'gift'))));
+    el('span', { textContent: `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name}${r.cls ? '（' + r.cls + '）' : ''} · 战力 ${r.power}` }),
+    r.me ? '' : el('span', { style: 'display:flex;gap:4px;align-items:center' },
+      btn(r.gifted ? '已送' : '送礼物', 'giftFriend', { id: r.other }, 'btn-action', { disabled: r.gifted }), btn('删除', 'removeFriend', { id: r.id }, 'unequip')))));
+  if (rows.length === 1) $('rank-list').append(el('div', { className: 'hint', textContent: '还没有好友，输入同学的学号加好友，一起比拼战力吧！' }));
+  const box = $('fr-req'); box.replaceChildren();
+  fr.filter(f => f.status === 'incoming').forEach(f => box.append(el('div', { className: 'rank-item' },
+    el('span', { textContent: `📩 ${f.name}${f.className ? '（' + f.className + '）' : ''} 想加你为好友` }),
+    el('span', { style: 'display:flex;gap:4px' }, btn('同意', 'acceptFriend', { id: f.id }), btn('拒绝', 'rejectFriend', { id: f.id }, 'unequip')))));
+  fr.filter(f => f.status === 'outgoing').forEach(f => box.append(el('div', { className: 'rank-item' },
+    el('span', { className: 'hint', textContent: `⏳ 已向 ${f.code} 发送申请，等对方同意` }), btn('取消', 'removeFriend', { id: f.id }, 'unequip'))));
 }
 function renderPet() {
   const stage = PET_STAGES[state.petLevel], img = $('pet-img');
@@ -424,13 +449,13 @@ function renderHall() {
   });
 }
 
-function renderSubs() {
-  const box = $('subjects-container'); box.replaceChildren();
+function renderSubs() {                                    // 签到由老师在后台勾选，学生只能查看
+  const box = $('subjects-container'), rec = Auth.records(); box.replaceChildren();
   SUBS.forEach(sub => {
-    const done = state.completed.includes(sub);
+    const done = (rec[`${today()}|${Auth.CHECKIN}|${sub}`] || []).includes(me.id);
     box.append(el('div', { className: 'subject-item' + (done ? ' done' : '') },
       el('span', { textContent: sub, style: 'font-weight:600;font-size:.9rem' }),
-      btn(done ? '已完成 ✓' : '打卡 +10🪙', 'checkin', { id: sub }, 'btn-action', { disabled: done })));
+      el('span', { textContent: done ? '✅ 老师已签到' : '⏳ 等老师签到', style: done ? 'color:var(--ok);font-weight:700;font-size:.85rem' : 'color:var(--muted);font-size:.85rem' })));
   });
 }
 function renderSlots() {
@@ -467,9 +492,16 @@ function renderMusic() {
     });
   });
 }
-function renderMessages() {
-  const box = $('msg-list'); box.replaceChildren();
-  state.messages.forEach(m => box.append(el('div', { className: 'msg-item' }, el('b', { textContent: '我: ' }), m))); // 纯文本，防 XSS
+function renderMessages() {                                // 留言墙：同班和全部班级的留言（纯文本显示，防 XSS）
+  const box = $('msg-list'), uid = Auth.users().find(u => u.id === me.id)?.uid; box.replaceChildren();
+  const posts = Auth.wall().slice(0, 50);
+  if (!posts.length) return box.append(el('div', { className: 'hint', textContent: '还没有留言，来写第一条吧！' }));
+  posts.forEach(p => box.append(el('div', { className: 'msg-item' },
+    el('div', { style: 'display:flex;justify-content:space-between;gap:6px;align-items:center' },
+      el('span', {}, el('b', { textContent: `${p.role === 'teacher' ? '【老师】' : ''}${p.name}` }),
+        el('span', { className: 'hint', style: 'font-size:.75rem', textContent: `　${p.classId ? '同班' : '🌐 全部班级'}　${new Date(p.time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` })),
+      p.authorId === uid ? btn('删除', 'delPost', { id: p.id }, 'unequip') : ''),
+    el('div', { textContent: p.body, style: 'margin-top:2px;overflow-wrap:anywhere' }))));
 }
 
 // ===== 行为 =====
@@ -486,10 +518,6 @@ const ACTIONS = {
     document.querySelectorAll('.tab-btn').forEach(b => b.setAttribute('aria-selected', b.dataset.id === id));
   },
   cheat() { state.coins += 500; render(); toast('🪙 已增加 500 金币（调试）'); },
-  checkin({ id }) {
-    if (state.completed.includes(id)) return;
-    state.completed.push(id); state.coins += 10; state.stars += 1; render();
-  },
   hatch() {
     if (state.coins < HATCH_COST) return toast(`❌ 金币不足，孵化需要 ${HATCH_COST} 金币`);
     state.coins -= HATCH_COST; state.petLevel = 1; state.pet.mood = 70; state.pet.tick = Date.now(); render(); toast('🎉 咔嚓！宠物蛋破壳，你的专属宠物诞生啦！');
@@ -540,11 +568,17 @@ const ACTIONS = {
     }
     playSong(s, false);
   },
-  post() {
-    const input = $('msg-input'), text = input.value.trim();
+  async post() {
+    const input = $('msg-input'), text = input.value.trim(), all = $('msg-scope').value === 'all';
     if (!text) return toast('请先写点内容再发布');
-    state.messages.unshift(text); state.messages.length = Math.min(state.messages.length, 50);
-    input.value = ''; renderMessages(); save();
+    if (!all && !myClassId()) return toast('你还没有班级，暂时只能发给全部班级');
+    try { await Auth.postWall(text, all ? null : myClassId()); } catch (e) { return toast('❌ ' + e.message); }
+    input.value = ''; renderMessages(); toast('已发布');
+  },
+  async delPost({ id }) {
+    if (!confirm('确定删除这条留言？')) return;
+    try { await Auth.delPost(id); } catch (e) { return toast('❌ ' + e.message); }
+    renderMessages();
   },
   sell({ id }) {
     const i = +id, it = state.inventory[i];
@@ -584,7 +618,25 @@ const ACTIONS = {
   feed() { care('feed', 25, 1, 5); },
   play() { care('play', 15, 3, 0); },
   pat() { care('pat', 5, 1, 0); },
-  gift() { toast('🎁 送礼功能演示中'); },
+  async addFriend() {
+    const input = $('fr-code'), code = input.value.trim();
+    if (!code) return toast('请先输入同学的学号');
+    let msg;
+    try { msg = await Auth.friendRequest(code); } catch (e) { return toast('❌ ' + e.message); }
+    input.value = ''; renderRank(); toast('✅ ' + msg);
+  },
+  async acceptFriend({ id }) { try { await Auth.friendRespond(id, true); } catch (e) { return toast('❌ ' + e.message); } renderRank(); toast('🎉 你们成为好友了！'); },
+  async rejectFriend({ id }) { try { await Auth.friendRespond(id, false); } catch (e) { return toast('❌ ' + e.message); } renderRank(); },
+  async removeFriend({ id }) {
+    if (!confirm('确定删除这位好友（或取消这个申请）吗？')) return;
+    try { await Auth.friendRemove(id); } catch (e) { return toast('❌ ' + e.message); }
+    renderRank();
+  },
+  async giftFriend({ id }) {
+    let msg;
+    try { msg = await Auth.sendGift(id); } catch (e) { return toast('❌ ' + e.message); }
+    renderRank(); toast('🎁 ' + msg);
+  },
   logout() { Auth.logout(); }
 };
 
@@ -626,8 +678,8 @@ async function claim() {                                   // 领取老师发放
   if (!got.length) return;
   const c = got.reduce((n, x) => n + x.coins, 0), t = got.reduce((n, x) => n + x.stars, 0);
   state.coins = Math.max(0, state.coins + c); state.stars = Math.max(0, state.stars + t);
-  save(); Auth.pushMySave(state, true);
-  toast(`🎁 老师发放了 ${c}🪙 ${t}⭐`);
+  save(); pushSave(true);
+  toast(`🎁 你收到了 ${c}🪙 ${t}⭐`);
 }
 async function poll() {                                    // 同步老师新发布的公告和奖励
   try { await Auth.refresh(); await claim(); render(); } catch (e) { /* 网络不好时下次再试 */ }
@@ -643,8 +695,8 @@ Auth.ready.then(async () => {
   } catch (e) { toast('⚠️ 暂时无法同步存档，请检查网络'); }
   render(); renderMessages();
   setInterval(() => { if (!document.hidden) poll(); }, 30000);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) Auth.pushMySave(state, true); } else poll(); });
-  window.addEventListener('pagehide', () => { if (synced) Auth.pushMySave(state, true); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) pushSave(true); } else poll(); });
+  window.addEventListener('pagehide', () => { if (synced) pushSave(true); });
 }).catch(() => {});
 </script>
 </body>

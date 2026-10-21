@@ -65,10 +65,10 @@ td.act{display:flex;gap:6px}
     <h2>📝 默写 / 功课名单</h2>
     <div class="row">
       <label>日期<input id="r-date" type="date"></label>
-      <label>类型<select id="r-kind"><option>默写</option><option>功课</option></select></label>
+      <label>类型<select id="r-kind"><option>签到</option><option>默写</option><option>功课</option></select></label>
       <button class="b ghost" data-a="copyTodo">复制未完成名单</button>
     </div>
-    <div style="margin:8px 0;font-size:.82rem;color:var(--muted)">在补习中心默写或做完功课，老师直接勾选即可，打勾自动保存。表头的“全勾”可一次勾选/取消全班。</div>
+    <div style="margin:8px 0;font-size:.82rem;color:var(--muted)">在补习中心默写或做完功课，老师直接勾选即可，打勾自动保存。类型选“签到”时，每勾一科学生自动得 10🪙 + 1⭐（取消勾选会扣回），学生自己不能签到。表头的“全勾”可一次勾选/取消全班。</div>
     <div class="scroll"><table id="roster"></table></div>
     <details style="margin-top:12px">
       <summary id="roster-sum-title" style="cursor:pointer;font-weight:700;font-size:.9rem">📋 各科未完成名单</summary>
@@ -150,6 +150,19 @@ td.act{display:flex;gap:6px}
 
   <section class="card">
     <details>
+      <summary style="cursor:pointer;font-weight:700;font-size:1.05rem">💬 留言墙管理（查看、删除不当留言）</summary>
+      <div style="margin:8px 0;font-size:.85rem;color:var(--muted)">这里显示当前班级的留言和“全部班级”的留言。学生每小时最多发 10 条。</div>
+      <div class="row">
+        <label>发布范围<select id="tw-scope"><option value="class">当前班级</option><option value="all">全部班级</option></select></label>
+        <label style="flex:1;min-width:200px">内容<input id="tw-body" maxlength="200" style="width:100%"></label>
+        <button class="b" data-a="teacherPost">以老师身份发布</button>
+      </div>
+      <div id="tw-list" style="margin-top:10px"></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <details>
       <summary style="cursor:pointer;font-weight:700;font-size:1.05rem">🎓 一键升班（新学年用）</summary>
       <div style="margin:8px 0;font-size:.85rem;color:var(--muted);line-height:1.6">给每个班选择升到哪个班，点“一键升班”后，整班学生一次移过去，学号不变。<br>六年级请升到一个叫“已毕业”的班级（先在管理员的班级管理里建好）。普通老师需要同时负责升入前后两个班，管理员没有这个限制。</div>
       <div id="promote-list"></div>
@@ -171,7 +184,7 @@ td.act{display:flex;gap:6px}
   <section class="card">
     <h2>📋 学生列表（<span id="count">0</span> 人）</h2>
     <div class="scroll"><table>
-      <thead><tr><th>姓名 / 学号</th><th>宠物</th><th>金币</th><th>星星</th><th>今日打卡</th><th>操作</th></tr></thead>
+      <thead><tr><th>姓名 / 学号</th><th>宠物</th><th>金币</th><th>星星</th><th>今日签到</th><th>操作</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
     <div id="empty" class="empty" hidden>还没有学生，请先在上方添加。</div>
@@ -201,6 +214,23 @@ function gradeOf(code) {
   if (!m) return '';
   const g = new Date().getFullYear() % 100 - Number(m[1]) + 1;
   return g < 1 ? '尚未入学' : g > 6 ? '已毕业' : `${CN[g - 1]}年级`;
+}
+
+// ===== 留言墙管理 =====
+function renderWall() {
+  const box = $('tw-list'); box.replaceChildren();
+  const isAdmin = myUser().admin, mine = new Set(Auth.users().map(u => u.uid));
+  const posts = Auth.wall().filter(p => p.classId === curClass || !p.classId).slice(0, 40);
+  if (!posts.length) return box.append(el('div', { className: 'empty', textContent: '还没有留言。' }));
+  posts.forEach(p => {
+    const canDel = isAdmin || p.classId === curClass || mine.has(p.authorId);
+    box.append(el('div', { style: 'border-top:1px dashed var(--border);padding:8px 0;font-size:.88rem;display:flex;justify-content:space-between;gap:8px;align-items:flex-start' },
+      el('div', {},
+        el('b', { textContent: `${p.role === 'teacher' ? '【老师】' : ''}${p.name}` }),
+        el('span', { textContent: `　${p.classId ? '同班' : '🌐 全部班级'}　${new Date(p.time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, style: 'color:var(--muted);font-size:.78rem' }),
+        el('div', { textContent: p.body, style: 'margin-top:2px;overflow-wrap:anywhere' })),
+      canDel ? btn('删除', 'delWall', p.id, 'b red') : ''));
+  });
 }
 
 // ===== 一键升班 =====
@@ -397,13 +427,13 @@ function renderNotices() {
 }
 
 function render() {
-  renderClassSelect(); renderAdmin(); renderPubTargets(); renderPromote(); renderHall(); renderHofWho();
+  renderClassSelect(); renderAdmin(); renderPubTargets(); renderPromote(); renderWall(); renderHall(); renderHofWho();
   renderNotices(); renderRoster(); renderTopics();
   const list = students(), body = $('rows'); body.replaceChildren();
   $('count').textContent = list.length; $('empty').hidden = list.length > 0;
   list.forEach(u => {
     const d = Auth.loadSave(u.id) || {}, pa = Auth.pendingAward(u.id);
-    const done = d.date === today() ? (d.completed || []).length : 0;
+    const rec = Auth.records(), done = Auth.SUBJECTS.filter(sj => (rec[`${today()}|${Auth.CHECKIN}|${sj}`] || []).includes(u.id)).length;
     body.append(el('tr', {},
       el('td', { textContent: `${u.name}（${u.id}${gradeOf(u.id) ? '·' + gradeOf(u.id) : ''}）` }),
       el('td', { textContent: PETS[d.petLevel || 0] || '-' }),
@@ -460,6 +490,18 @@ const A = {
     try { await Auth.delHall(id); } catch (err) { return toast('删除失败：' + err.message); }
     if (Auth.hall().some(x => x.id === id)) return toast('只能删除自己录入的条目（管理员除外）');
     render(); toast('已删除');
+  },
+  async teacherPost() {
+    const text = $('tw-body').value.trim(), all = $('tw-scope').value === 'all';
+    if (!text) return toast('请先写点内容');
+    if (!all && !curClass) return toast('请先选择班级');
+    try { await Auth.postWall(text, all ? null : curClass); } catch (e) { return toast('发布失败：' + e.message); }
+    $('tw-body').value = ''; render(); toast('已发布');
+  },
+  async delWall(id) {
+    if (!confirm('确定删除这条留言？')) return;
+    try { await Auth.delPost(id); } catch (e) { return toast('删除失败：' + e.message); }
+    render();
   },
   async edit(id) {                                         // 修改姓名 / 学号
     const u = Auth.users().find(x => x.id === id);

@@ -14,9 +14,10 @@ const Auth = (() => {
   // ---- 缓存：登录后从 Supabase 读来，页面代码仍然可以同步读取 ----
   const SUBJECTS = ['BC 华文', 'BM 马来文', 'BI 英文', 'MM 数学', 'SC 科学'];
   const KIND = { notice: '📢 公告', task: '🎯 任务', homework: '📚 功课' };
+  const CHECKIN = '签到', CHECKIN_REWARD = { coins: 10, stars: 1 };     // 老师给学生签到一科，学生自动得到的奖励
   const clone = x => JSON.parse(JSON.stringify(x));
   const ck = r => { if (r && r.error) throw new Error(r.error.message); return r; };
-  let U = [], C = [], N = [], T = [], RC = {}, SV = {}, PA = {}, H = [];
+  let U = [], C = [], N = [], T = [], RC = {}, SV = {}, PA = {}, H = [], WP = [], FR = [];
   const LD = new Set([new Date().toLocaleDateString('sv')]);          // 已载入名单的日期
   const PH = {};                                                      // 等待上传的证明照片（dataURL）
   const uidOf = code => U.find(u => u.id === code)?.uid;
@@ -36,12 +37,18 @@ const Auth = (() => {
       sb.from('records').select('day,kind,subject,student_id').in('day', [...LD]),
       sb.from('game_saves').select('user_id,data'),
       sb.from('awards').select('student_id,coins,stars').eq('claimed', false),
-      sb.from('hall_of_fame').select('*').order('score', { ascending: false })    // 封神榜：表还没建时当作空，不影响其他功能
+      sb.from('hall_of_fame').select('*').order('score', { ascending: false }),   // 封神榜：表还没建时当作空，不影响其他功能
+      sb.from('wall_posts').select('*').order('created_at', { ascending: false }).limit(100),   // 留言墙（同上）
+      sb.rpc('my_friends')                                                                       // 好友（同上）
     ]);
     rs.slice(0, 10).forEach(ck);
     const [p, c, tc, n, s, t, td, r, g, a] = rs.map(x => x.data);
     H = (rs[10].error ? [] : rs[10].data).map(x => ({ id: x.id, name: x.name, studentId: x.student_id, classLabel: x.class_label, subject: x.subject,
       exam: x.exam, score: Number(x.score), remark: x.remark, isPublic: x.is_public, createdBy: x.created_by }));
+    WP = (rs[11].error ? [] : rs[11].data).map(x => ({ id: x.id, authorId: x.author_id, name: x.author_name, role: x.author_role,
+      classId: x.class_id, body: x.body, time: Date.parse(x.created_at) }));
+    FR = (rs[12].error ? [] : rs[12].data).map(x => ({ id: x.id, status: x.status, otherId: x.other_id, code: x.code, name: x.name,
+      className: x.class_name, petLevel: x.pet_level, power: x.power, giftedToday: x.gifted_today }));
     const tcm = {};
     tc.forEach(x => (tcm[x.teacher_id] ||= []).push(x.class_id));
     U = p.map(x => ({ uid: x.user_id, id: x.code, name: x.name, role: x.role, admin: x.is_admin, classId: x.class_id, classIds: tcm[x.user_id] || [] }));
@@ -125,6 +132,15 @@ const Auth = (() => {
       const add = b.filter(c => !a.includes(c)), del = a.filter(c => !b.includes(c));
       if (add.length) ops.push(async () => ck(await sb.from('records').upsert(add.map(c => ({ day, kind, subject, student_id: uidOf(c) })), { onConflict: 'day,kind,subject,student_id', ignoreDuplicates: true })));
       if (del.length) ops.push(async () => ck(await sb.from('records').delete().eq('day', day).eq('kind', kind).eq('subject', subject).in('student_id', del.map(uidOf))));
+      if (kind === CHECKIN) {                                        // 签到：每勾一科自动发奖励，取消勾选就扣回
+        const rows = [...add.map(c => [c, 1]), ...del.map(c => [c, -1])];
+        for (const [c, sign] of rows) {
+          const o = PA[c] ||= { coins: 0, stars: 0 };
+          o.coins += sign * CHECKIN_REWARD.coins; o.stars += sign * CHECKIN_REWARD.stars;
+        }
+        if (rows.length) ops.push(async () => ck(await sb.from('awards').insert(rows.map(([c, sign]) => ({
+          student_id: uidOf(c), coins: sign * CHECKIN_REWARD.coins, stars: sign * CHECKIN_REWARD.stars, note: `签到：${subject}` })))));
+      }
     }
     return ops;
   }
@@ -166,16 +182,34 @@ const Auth = (() => {
     return data ? data.data : null;
   }
   let pushTimer;
-  function pushMySave(obj, now) {
+  function pushMySave(obj, now, extra) {
     clearTimeout(pushTimer);
     const go = async () => {
       try {
         const { data: { session } } = await sb.auth.getSession();
-        if (session) ck(await sb.from('game_saves').upsert({ user_id: session.user.id, data: obj, updated_at: new Date().toISOString() }));
+        if (session) ck(await sb.from('game_saves').upsert({ user_id: session.user.id, data: obj, updated_at: new Date().toISOString(), ...(extra || {}) }));
       } catch (e) { console.warn('存档同步失败', e.message); }
     };
     if (now) go(); else pushTimer = setTimeout(go, 1500);
   }
+  // ---- 留言墙：同班或全部班级 ----
+  const wall = () => clone(WP);
+  const postWall = (body, classId) => wrap(sb.from('wall_posts').insert({ body, class_id: classId || null }));
+  const delPost = id => wrap(sb.from('wall_posts').delete().eq('id', id));
+
+  // ---- 好友：申请 / 同意 / 删除 / 送礼物（规则都在数据库函数里，前端绕不过去） ----
+  const friends = () => clone(FR);
+  async function rpc(name, args) {
+    const { data, error } = await sb.rpc(name, args);
+    if (error) throw new Error(error.message);
+    await refresh();
+    return data;
+  }
+  const friendRequest = code => rpc('friend_request', { p_code: code });
+  const friendRespond = (id, accept) => rpc('friend_respond', { p_id: id, p_accept: accept });
+  const friendRemove = id => rpc('friend_remove', { p_id: id });
+  const sendGift = otherId => rpc('send_gift', { p_friend: otherId });
+
   const saveKey = id => 'petsStory.save.' + id;                       // 本机备份用
 
   // ---- 会话 ----
@@ -251,7 +285,7 @@ const Auth = (() => {
     return data;
   }
 
-  return { sb, refresh, loadDay, busy, call, promote, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
+  return { sb, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGift, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
     users, classes, ready, session, login, logout, guard, START, SUBJECTS, KIND, saveKey,
     notices, saveNotices, topics, saveTopics, records, saveRecords, sub, setProof, delProof, proofUrl,
     grant, claimAwards, pendingAward, loadSave, fetchMySave, pushMySave };
