@@ -395,7 +395,7 @@ function renderHall() {
   const uid = Auth.users().find(u => u.id === me.id)?.uid, all = Auth.hall().filter(e => e.subject === hofSubj);
   const group = list => {
     const m = new Map();
-    list.forEach(e => { const k = e.who || e.studentId || e.name.trim().toLowerCase(); if (!m.has(k) || e.score > m.get(k).score) m.set(k, e); });
+    list.forEach(e => { const k = e.studentId || e.name.trim().toLowerCase(); if (!m.has(k) || e.score > m.get(k).score) m.set(k, e); });
     return [...m.values()].sort((a, b) => b.score - a.score);
   };
   const board = group(all.filter(e => e.isPublic)), rankOf = sc => 1 + board.filter(e => e.score > sc).length;

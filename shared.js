@@ -36,17 +36,12 @@ const Auth = (() => {
       sb.from('records').select('day,kind,subject,student_id').in('day', [...LD]),
       sb.from('game_saves').select('user_id,data'),
       sb.from('awards').select('student_id,coins,stars').eq('claimed', false),
-      sb.from('hall_of_fame').select('*').order('score', { ascending: false }),   // 老师：完整姓名（表还没建时当作空，不影响其他功能）
-      sb.rpc('hall_public')                                                      // 学生：只有姓名缩写
+      sb.from('hall_of_fame').select('*').order('score', { ascending: false })    // 封神榜：表还没建时当作空，不影响其他功能
     ]);
     rs.slice(0, 10).forEach(ck);
     const [p, c, tc, n, s, t, td, r, g, a] = rs.map(x => x.data);
-    const own = rs[10].error ? [] : rs[10].data, pub = rs[11].error ? [] : rs[11].data;
-    H = own.length
-      ? own.map(x => ({ id: x.id, name: x.name, who: x.student_id || x.name.trim().toLowerCase(), studentId: x.student_id, classLabel: x.class_label,
-          subject: x.subject, exam: x.exam, score: Number(x.score), remark: x.remark, isPublic: x.is_public, createdBy: x.created_by }))
-      : pub.map(x => ({ id: x.id, name: x.abbr, who: x.who, studentId: x.student_id, classLabel: x.class_label,
-          subject: x.subject, exam: x.exam, score: Number(x.score), remark: x.remark, isPublic: x.is_public }));
+    H = (rs[10].error ? [] : rs[10].data).map(x => ({ id: x.id, name: x.name, studentId: x.student_id, classLabel: x.class_label, subject: x.subject,
+      exam: x.exam, score: Number(x.score), remark: x.remark, isPublic: x.is_public, createdBy: x.created_by }));
     const tcm = {};
     tc.forEach(x => (tcm[x.teacher_id] ||= []).push(x.class_id));
     U = p.map(x => ({ uid: x.user_id, id: x.code, name: x.name, role: x.role, admin: x.is_admin, classId: x.class_id, classIds: tcm[x.user_id] || [] }));
