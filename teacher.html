@@ -129,6 +129,27 @@ td.act{display:flex;gap:6px}
 
   <section class="card">
     <details>
+      <summary style="cursor:pointer;font-weight:700;font-size:1.05rem">🏆 封神榜管理（录入考试成绩）</summary>
+      <div style="margin:8px 0;font-size:.85rem;color:var(--muted);line-height:1.6">录入全中心的优秀成绩（包括已毕业的学长学姐），学生在“🏆 封神榜”里能看到各科前十名。<br>只有勾选“公开”的条目学生才看得到，学生看到的是姓名缩写（Oo Chang Zhe 显示为 O.C.Z.，王小明 显示为 王＊明），仍然建议先征得本人或家长同意。</div>
+      <div class="row">
+        <label>选择学生<select id="h-who"></select></label>
+        <label>姓名<input id="h-name" maxlength="40"></label>
+        <label>班别 / 届别<input id="h-cls" maxlength="30" placeholder="例如：2023 届毕业生"></label>
+        <label>科目<select id="h-subj"></select></label>
+        <label>考试名称<input id="h-exam" maxlength="30" placeholder="例如：2025 年终考试"></label>
+        <label>分数（百分制）<input id="h-score" type="number" min="0" max="100" step="0.01"></label>
+        <label>备注（选填）<input id="h-remark" maxlength="30" placeholder="例如：UPSR 7A"></label>
+      </div>
+      <label style="display:block;margin:8px 0;font-size:.85rem"><input id="h-pub" type="checkbox" style="width:auto"> 已征得本人/家长同意，在学生端公开显示</label>
+      <button class="b" data-a="hofAdd">录入</button>
+      <div class="row" style="margin:14px 0 8px"><label>只看科目<select id="hf-subj"><option value="">全部</option></select></label></div>
+      <div style="font-size:.85rem;margin-bottom:6px">共 <span id="hof-count">0</span> 条（按分数从高到低）</div>
+      <div class="scroll"><table><thead><tr><th>姓名</th><th>学生看到的</th><th>班别/届别</th><th>科目</th><th>考试</th><th>分数</th><th>公开</th><th>操作</th></tr></thead><tbody id="hof-rows"></tbody></table></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <details>
       <summary style="cursor:pointer;font-weight:700;font-size:1.05rem">🎓 一键升班（新学年用）</summary>
       <div style="margin:8px 0;font-size:.85rem;color:var(--muted);line-height:1.6">给每个班选择升到哪个班，点“一键升班”后，整班学生一次移过去，学号不变。<br>六年级请升到一个叫“已毕业”的班级（先在管理员的班级管理里建好）。普通老师需要同时负责升入前后两个班，管理员没有这个限制。</div>
       <div id="promote-list"></div>
@@ -171,7 +192,8 @@ let tt; const toast = m => { const t = $('toast'); t.textContent = m; t.classLis
 let curClass = '';
 const myUser = () => Auth.users().find(u => u.id === me.id) || me;
 const myClasses = () => { const u = myUser(), all = Auth.classes(); return u.admin ? all : all.filter(c => (u.classIds || []).includes(c.id)); };
-const students = () => Auth.users().filter(u => u.role === 'student' && u.classId === curClass);
+const students = () => Auth.users().filter(u => u.role === 'student' && u.classId === curClass)
+  .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));   // 学生列表和所有名单都按学号排序
 // 从学号算出现在读几年级：学号 = p + 入学年份后两位 + 3位序号（如 p26001 = 2026 年入读一年级）
 const CN = ['一', '二', '三', '四', '五', '六'];
 function gradeOf(code) {
@@ -204,6 +226,35 @@ function renderPromote() {
     box.append(el('div', { style: 'display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap' },
       el('span', { textContent: `${c.name}（${n} 人）→`, style: 'min-width:160px' }), sel));
   });
+}
+
+// 姓名缩写（和数据库里的 abbr() 规则一致）：Oo Chang Zhe → O.C.Z.；王小明 → 王＊明
+function abbr(name) {
+  let c = String(name || '').trim();
+  if (/[一-龥]/.test(c)) {
+    c = c.replace(/\s+/g, '');
+    return c.length <= 1 ? c : c.length === 2 ? c[0] + '＊' : c[0] + '＊'.repeat(c.length - 2) + c[c.length - 1];
+  }
+  return c.split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase() + '.').join('');
+}
+
+// ===== 封神榜管理 =====
+function renderHall() {
+  const f = $('hf-subj').value, rows = $('hof-rows'); rows.replaceChildren();
+  const list = Auth.hall().filter(e => !f || e.subject === f).sort((a, b) => b.score - a.score);
+  $('hof-count').textContent = list.length;
+  if (!list.length) return rows.append(el('tr', {}, el('td', { colSpan: 8, className: 'empty', textContent: '还没有录入成绩。' })));
+  list.forEach(e => rows.append(el('tr', {},
+    el('td', { textContent: e.name }), el('td', { textContent: abbr(e.name) }), el('td', { textContent: e.classLabel }), el('td', { textContent: e.subject }),
+    el('td', { textContent: e.exam }), el('td', { textContent: `${e.score}${e.remark ? '（' + e.remark + '）' : ''}` }),
+    el('td', { textContent: e.isPublic ? '✅ 公开' : '🔒 不公开' }),
+    el('td', { className: 'act' }, btn(e.isPublic ? '取消公开' : '设为公开', 'hofPub', e.id, 'b ghost'), btn('删除', 'hofDel', e.id, 'b red')))));
+}
+function renderHofWho() {                                  // “选择学生”下拉：当前班级的学生（毕业生选第一项，手动填姓名）
+  const sel = $('h-who'), keep = sel.value;
+  sel.replaceChildren(new Option('（手动输入姓名，如毕业生）', ''));
+  students().forEach(u => sel.append(new Option(`${u.name}（${u.id}）`, u.id)));
+  sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
 }
 
 function renderClassSelect() {
@@ -356,7 +407,7 @@ function renderNotices() {
 }
 
 function render() {
-  renderClassSelect(); renderAdmin(); renderPubTargets(); renderPromote();
+  renderClassSelect(); renderAdmin(); renderPubTargets(); renderPromote(); renderHall(); renderHofWho();
   renderNotices(); renderRoster(); renderTopics();
   const list = students(), body = $('rows'); body.replaceChildren();
   $('count').textContent = list.length; $('empty').hidden = list.length > 0;
@@ -394,6 +445,31 @@ const A = {
     try { await Auth.call('createStudent', { code: id, name, password: pw, classId: curClass }); }
     catch (e) { return toast('添加失败：' + e.message); }
     ['n-id', 'n-name', 'n-pw'].forEach(i => $(i).value = ''); render(); toast(`已添加 ${name}（学号会统一转成小写）`);
+  },
+  async hofAdd() {
+    const who = $('h-who').value, name = $('h-name').value.trim(), score = parseFloat($('h-score').value);
+    if (!name) return toast('请填写姓名');
+    if (!(score >= 0 && score <= 100)) return toast('分数请填 0 到 100 之间的数字');
+    const stu = who ? Auth.users().find(u => u.id === who) : null;
+    try {
+      await Auth.addHall({ name, student_id: stu ? stu.uid : null, class_label: $('h-cls').value.trim(), subject: $('h-subj').value,
+        exam: $('h-exam').value.trim(), score, remark: $('h-remark').value.trim(), is_public: $('h-pub').checked });
+    } catch (e) { return toast('录入失败：' + e.message); }
+    ['h-score', 'h-remark'].forEach(i => $(i).value = ''); render(); toast('已录入');
+  },
+  async hofPub(id) {
+    const e = Auth.hall().find(x => x.id === id);
+    if (!e) return;
+    try { await Auth.setHallPublic(id, !e.isPublic); } catch (err) { return toast('操作失败：' + err.message); }
+    if (Auth.hall().find(x => x.id === id)?.isPublic === e.isPublic) return toast('只能修改自己录入的条目（管理员除外）');
+    render();
+  },
+  async hofDel(id) {
+    const e = Auth.hall().find(x => x.id === id);
+    if (!e || !confirm(`确定删除 ${e.name} 的这条成绩？`)) return;
+    try { await Auth.delHall(id); } catch (err) { return toast('删除失败：' + err.message); }
+    if (Auth.hall().some(x => x.id === id)) return toast('只能删除自己录入的条目（管理员除外）');
+    render(); toast('已删除');
   },
   async edit(id) {                                         // 修改姓名 / 学号
     const u = Auth.users().find(x => x.id === id);
@@ -578,6 +654,12 @@ $('me').textContent = me.name;
 $('r-date').value = today(); $('r-date').onchange = async () => { await Auth.loadDay(rState().d); renderRoster(); };   // 切换日期时载入那天的记录
 $('r-kind').onchange = renderRoster;
 Auth.SUBJECTS.forEach(x => { $('t-subj').append(new Option(x, x)); $('t-filter').append(new Option(x, x)); });
+['总分', ...Auth.SUBJECTS].forEach(x => { $('h-subj').append(new Option(x, x)); $('hf-subj').append(new Option(x, x)); });
+$('hf-subj').onchange = renderHall;
+$('h-who').onchange = () => {                              // 选了在校学生就自动填姓名和班别
+  const u = Auth.users().find(x => x.id === $('h-who').value);
+  if (u) { $('h-name').value = u.name; $('h-cls').value = curClassName(); }
+};
 $('t-filter').onchange = renderTopics;
 document.addEventListener('change', e => {                 // 主题名单：勾选自动保存
   const c = e.target.closest('[data-tid]');

@@ -16,7 +16,7 @@ const Auth = (() => {
   const KIND = { notice: '📢 公告', task: '🎯 任务', homework: '📚 功课' };
   const clone = x => JSON.parse(JSON.stringify(x));
   const ck = r => { if (r && r.error) throw new Error(r.error.message); return r; };
-  let U = [], C = [], N = [], T = [], RC = {}, SV = {}, PA = {};
+  let U = [], C = [], N = [], T = [], RC = {}, SV = {}, PA = {}, H = [];
   const LD = new Set([new Date().toLocaleDateString('sv')]);          // 已载入名单的日期
   const PH = {};                                                      // 等待上传的证明照片（dataURL）
   const uidOf = code => U.find(u => u.id === code)?.uid;
@@ -35,10 +35,18 @@ const Auth = (() => {
       sb.from('topic_done').select('topic_id,student_id'),
       sb.from('records').select('day,kind,subject,student_id').in('day', [...LD]),
       sb.from('game_saves').select('user_id,data'),
-      sb.from('awards').select('student_id,coins,stars').eq('claimed', false)
+      sb.from('awards').select('student_id,coins,stars').eq('claimed', false),
+      sb.from('hall_of_fame').select('*').order('score', { ascending: false }),   // 老师：完整姓名（表还没建时当作空，不影响其他功能）
+      sb.rpc('hall_public')                                                      // 学生：只有姓名缩写
     ]);
-    rs.forEach(ck);
+    rs.slice(0, 10).forEach(ck);
     const [p, c, tc, n, s, t, td, r, g, a] = rs.map(x => x.data);
+    const own = rs[10].error ? [] : rs[10].data, pub = rs[11].error ? [] : rs[11].data;
+    H = own.length
+      ? own.map(x => ({ id: x.id, name: x.name, who: x.student_id || x.name.trim().toLowerCase(), studentId: x.student_id, classLabel: x.class_label,
+          subject: x.subject, exam: x.exam, score: Number(x.score), remark: x.remark, isPublic: x.is_public, createdBy: x.created_by }))
+      : pub.map(x => ({ id: x.id, name: x.abbr, who: x.who, studentId: x.student_id, classLabel: x.class_label,
+          subject: x.subject, exam: x.exam, score: Number(x.score), remark: x.remark, isPublic: x.is_public }));
     const tcm = {};
     tc.forEach(x => (tcm[x.teacher_id] ||= []).push(x.class_id));
     U = p.map(x => ({ uid: x.user_id, id: x.code, name: x.name, role: x.role, admin: x.is_admin, classId: x.class_id, classIds: tcm[x.user_id] || [] }));
@@ -230,6 +238,11 @@ const Auth = (() => {
     await refresh();
     return data;
   }
+  // ---- 封神榜 ----
+  const hall = () => clone(H);
+  const addHall = row => wrap(sb.from('hall_of_fame').insert(row));
+  const delHall = id => wrap(sb.from('hall_of_fame').delete().eq('id', id));
+  const setHallPublic = (id, on) => wrap(sb.from('hall_of_fame').update({ is_public: on }).eq('id', id));
   // 调用 Edge Function：createStudent / createTeacher / updateUser / resetPassword / deleteUser
   async function call(action, payload) {
     const { data, error } = await sb.functions.invoke('admin-users', { body: { action, ...payload } });
@@ -243,7 +256,7 @@ const Auth = (() => {
     return data;
   }
 
-  return { sb, refresh, loadDay, busy, call, promote, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
+  return { sb, refresh, loadDay, busy, call, promote, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
     users, classes, ready, session, login, logout, guard, START, SUBJECTS, KIND, saveKey,
     notices, saveNotices, topics, saveTopics, records, saveRecords, sub, setProof, delProof, proofUrl,
     grant, claimAwards, pendingAward, loadSave, fetchMySave, pushMySave };

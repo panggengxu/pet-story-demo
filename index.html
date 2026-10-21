@@ -63,6 +63,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
       <button class="tab-btn" role="tab" data-action="tab" data-id="home" aria-selected="true">🏠 首页</button>
       <button class="tab-btn" role="tab" data-action="tab" data-id="shop" aria-selected="false">🛒 宠物商店与抽奖</button>
       <button class="tab-btn" role="tab" data-action="tab" data-id="music" aria-selected="false">🎵 音乐盒</button>
+      <button class="tab-btn" role="tab" data-action="tab" data-id="hof" aria-selected="false">🏆 封神榜</button>
       <button class="tab-btn" role="tab" data-action="tab" data-id="social" aria-selected="false">💬 留言与好友</button>
     </div>
   </header>
@@ -142,6 +143,15 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
       <div class="card-heading">主题曲音乐盒 🎵（支持 30 秒试听）</div>
       <div id="music-container"></div>
       <audio id="bgm-player" controls style="width:100%;margin-top:16px" hidden></audio>
+    </div>
+  </div>
+
+  <div id="tab-hof" class="section-view" role="tabpanel">
+    <div class="card">
+      <div class="card-title">HALL OF FAME</div>
+      <div class="card-heading">🏆 封神榜：补习中心历届最强前十名</div>
+      <div class="hint" style="margin-bottom:10px">从学长学姐到现在的你们，各科成绩最好的前十名。你的目标：把自己的名字写上去！</div>
+      <div id="hof-box"></div>
     </div>
   </div>
 
@@ -291,7 +301,7 @@ const closeModals = () => document.querySelectorAll('.modal-overlay').forEach(m 
 function render() {
   $('coins').textContent = state.coins;
   $('stars').textContent = state.stars;
-  renderPet(); renderCare(); renderRank(); renderNotices(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
+  renderPet(); renderCare(); renderRank(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
   save();
 }
 const gearPower = it => it ? (POOL.find(p => p.name === it.name)?.power ?? 0) : 0;
@@ -374,6 +384,45 @@ function shrink(file, max = 720) {
   });
 }
 let proofFor = null, proofData = null;
+
+// ===== 封神榜：各科前十名；同一个人只算他最好的一次成绩；同分并列 =====
+let hofSubj = '总分';
+const fmt = n => +Number(n).toFixed(2);
+function renderHall() {
+  const box = $('hof-box');
+  if (!box) return;
+  box.replaceChildren();
+  const uid = Auth.users().find(u => u.id === me.id)?.uid, all = Auth.hall().filter(e => e.subject === hofSubj);
+  const group = list => {
+    const m = new Map();
+    list.forEach(e => { const k = e.who || e.studentId || e.name.trim().toLowerCase(); if (!m.has(k) || e.score > m.get(k).score) m.set(k, e); });
+    return [...m.values()].sort((a, b) => b.score - a.score);
+  };
+  const board = group(all.filter(e => e.isPublic)), rankOf = sc => 1 + board.filter(e => e.score > sc).length;
+  const top = board.filter(e => rankOf(e.score) <= 10);
+  const chips = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px' });
+  ['总分', ...Auth.SUBJECTS].forEach(s => chips.append(btn(s, 'hofSubj', { id: s }, s === hofSubj ? 'btn-action' : 'btn-action btn-gold')));
+  box.append(chips);
+
+  const mine = uid ? group(all.filter(e => e.studentId === uid))[0] : null;   // 自己的最好成绩（老师录入并关联了账号才有）
+  let msg = '老师还没有录入你这一科的成绩。';
+  if (mine) {
+    const r = rankOf(mine.score), tenth = top.length >= 10 ? top[top.length - 1].score : null;
+    const above = board.filter(e => e.score > mine.score).pop();               // 比我高的里面最接近的一位 = 下一个目标
+    msg = `🎯 你的最好成绩：${fmt(mine.score)} 分，目前排第 ${r} 名`;
+    if (r > 10 && tenth != null) msg += `；距离前十名还差 ${fmt(tenth - mine.score)} 分`;
+    msg += above ? `；再提高 ${fmt(above.score - mine.score)} 分就能超过 ${above.name}` : '；你是榜上第一名，继续保持！';
+  }
+  box.append(el('div', { textContent: msg, style: 'background:var(--soft);border-radius:10px;padding:10px;margin-bottom:10px;font-size:.88rem;line-height:1.6' }));
+
+  if (!top.length) return box.append(el('div', { className: 'hint', textContent: '这一科的封神榜还没有人上榜，等老师录入后就会出现。' }));
+  top.forEach(e => {
+    const r = rankOf(e.score);
+    box.append(el('div', { className: 'rank-item', style: uid && e.studentId === uid ? 'background:#eeeaff;border-radius:8px' : '' },
+      el('span', { textContent: `${['🥇', '🥈', '🥉'][r - 1] || r + '.'} ${e.name}${e.classLabel ? '（' + e.classLabel + '）' : ''}`, style: 'overflow-wrap:anywhere' }),
+      el('span', { textContent: `${fmt(e.score)} 分${e.exam ? ' · ' + e.exam : ''}`, style: 'color:var(--primary);font-weight:700;text-align:right' })));
+  });
+}
 
 function renderSubs() {
   const box = $('subjects-container'); box.replaceChildren();
@@ -531,6 +580,7 @@ const ACTIONS = {
     n.subs[me.id] = { status: 'pending', note, photo: !!proofData, time: Date.now() };
     Auth.saveNotices(all); closeModals(); render(); toast('已提交，等老师批准后发放奖励');
   },
+  hofSubj({ id }) { hofSubj = id; renderHall(); },
   feed() { care('feed', 25, 1, 5); },
   play() { care('play', 15, 3, 0); },
   pat() { care('pat', 5, 1, 0); },
