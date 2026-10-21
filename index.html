@@ -698,6 +698,37 @@ Auth.ready.then(async () => {
   document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) pushSave(true); } else poll(); });
   window.addEventListener('pagehide', () => { if (synced) pushSave(true); });
 }).catch(() => {});
+  // 1. 定义你的 4 只初阶随机宠物盲盒池（请确保图片路径和你在 GitHub 仓库里存放的路径一致）
+const petPool = [
+  { name: '炎系小恐龙', rank: 'Lv.1 初阶萌态', image: './pet/pet-fire.jpg' },
+  { name: '萝卜兔',     rank: 'Lv.1 初阶萌态', image: './pet/pet-plant.jpg' },
+  { name: '星空系猫咪', rank: 'Lv.1 初阶萌态', image: './pet/pet-cosmic.jpg' },
+  { name: '天空系飞马', rank: 'Lv.1 初阶萌态', image: './pet/pet-sky.jpg' }
+];
+
+// 2. 绑定你截图里看到的真实按钮 ID: 'pet-btn'
+const petBtn = document.getElementById('pet-btn');
+
+if (petBtn) {
+  petBtn.addEventListener('click', async () => {
+    // --- 这里保留你原本扣除 50 金币、请求 Supabase 的逻辑 ---
+    // 例如：let success = await deductCoins(50); if (!success) return;
+
+    // --- 核心随机盲盒抽取 ---
+    const randomIndex = Math.floor(Math.random() * petPool.length);
+    const chosenPet = petPool[randomIndex];
+
+    // --- 把随机抽到的结果填入你源码里的对应 ID ---
+    document.getElementById('pet-name').innerText = chosenPet.name;
+    document.getElementById('pet-rank-text').innerText = chosenPet.rank;
+    document.getElementById('pet-img').src = chosenPet.image;
+
+    // 抽完后，把按钮文字变成喂食/互动，或者隐藏/切换状态
+    petBtn.innerText = '喂食 (-5 💰)';
+    
+    // 如果需要把宠物名字和状态同步存进 Supabase 数据库，也可以在这里执行一次 update
+  });
+}
 </script>
 </body>
 </html>
