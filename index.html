@@ -257,7 +257,7 @@ const PET_TYPES = [
   { id: 'plant',  name: '萝卜兔',     weight: 1, stages: ['pet/pet-plant.jpg'] },
   { id: 'sky',    name: '天空飞熊',   weight: 1, stages: ['pet/pet-sky.jpg'] },
   { id: 'shadow', name: '暗影雷狼',   weight: 1, stages: ['pet/暗影雷狼.jpg'] },
-  { id: 'beluga', name: '雪羽',   weight: 1, stages: ['pet/雪羽.jpg'] }
+  { id: 'beluga', name: '雪羽',   weight: 2, stages: ['pet/雪羽.jpg'] }
 ];
 const petType = () => PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
 const petImage = lv => { const st = petType().stages; return st[Math.min(lv, st.length) - 1]; };
