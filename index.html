@@ -429,11 +429,10 @@ function renderRank() {                                    // 好友战力排行
   const fr = Auth.friends();
     const rows = [{ name: me.name + '（我）', power: calcPower(), me: true },
     ...fr.filter(f => f.status === 'accepted').map(f => {
-      let isOnline = false;
-      // 查找这个好友在数据库里的最后在线时间
+            let isOnline = false;
+      // 强行查找一次
       if (Auth.SV && Auth.SV.last_seen && Auth.SV.last_seen[f.otherId]) {
-        // 如果在线时间距离现在小于 2 分钟，就是绿点
-        isOnline = (Date.now() - Date.parse(Auth.SV.last_seen[f.otherId])) < 120000;
+        isOnline = true; // 只要数据库里有对方的时间，先强制亮绿点！
       }
       return { name: f.name, cls: f.className, power: f.power, id: f.id, other: f.otherId, isOnline };
     })
