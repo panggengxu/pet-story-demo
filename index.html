@@ -430,9 +430,9 @@ function renderRank() {                                    // 好友战力排行
     const rows = [{ name: me.name + '（我）', power: calcPower(), me: true },
     ...fr.filter(f => f.status === 'accepted').map(f => {
       let isOnline = false;
-      // 强行查找一次
       if (Auth.SV && Auth.SV.last_seen && Auth.SV.last_seen[f.otherId]) {
-        isOnline = true; // 只要数据库里有对方的时间，先强制亮绿点！
+        isOnline = true; 
+        console.log('好友', f.name, '在线时间:', Auth.SV.last_seen[f.otherId]); // 看看是不是取到了
       }
       return { name: f.name, cls: f.className, power: f.power, id: f.id, other: f.otherId, isOnline };
     })
