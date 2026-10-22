@@ -711,7 +711,7 @@ const ACTIONS = {
       if (!confirm('逃跑会判负，确定要关闭吗？')) return;
       // 逃跑逻辑可以这里写，目前简单点，直接关
     }
-    if (duelInterval) clearInterval(duelInterval);
+    if (duelRealtimeChannel) Auth.sb.removeChannel(duelRealtimeChannel); // 关闭通道
     closeModals();
   },
   previewSong({ id }) { playSong(SONGS.find(s => s.id == id), true); toast(`🎧 开始 ${PREVIEW_SECONDS} 秒免费试听`); },
@@ -904,69 +904,68 @@ function openDuelRoom(duelId, isDefender = false) {
   );
   openModal('duel-modal');
   
-  if (duelInterval) clearInterval(duelInterval);
-  duelInterval = setInterval(() => pollDuelState(duelId), 1500);
-  pollDuelState(duelId);
+  // 🔥 实时监听战斗状态 🔥
+  if (duelRealtimeChannel) Auth.sb.removeChannel(duelRealtimeChannel);
+  duelRealtimeChannel = Auth.sb.channel('duel-' + duelId)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${duelId}` }, payload => {
+      const d = payload.new;
+      updateDuelUI(d, isDefender);
+    })
+    .subscribe();
+
+  // 初次拉取
+  Auth.sb.from('duels').select('*').eq('id', duelId).single().then(({data}) => { if (data) updateDuelUI(data, isDefender); });
 }
 
-async function pollDuelState(duelId) {
-  if (!document.getElementById('duel-log')) { clearInterval(duelInterval); return; }
-  try {
-    const { data: d, error } = await Auth.sb.from('duels').select('*').eq('id', duelId).single();
-    if (error) throw error;
-    
-    const myUid = Auth.users().find(u => u.id === me.id)?.uid;
-    const isChallenger = (d.challenger === myUid);
-    
-    // 计算血量
-    const maxMyHp = (isChallenger ? d.a_power : d.b_power) * 3;
-    const maxOppHp = (isChallenger ? d.b_power : d.a_power) * 3;
-    const myHp = Math.max(0, isChallenger ? (d.a_hp ?? maxMyHp) : (d.b_hp ?? maxMyHp));
-    const oppHp = Math.max(0, isChallenger ? (d.b_hp ?? maxOppHp) : (d.a_hp ?? maxOppHp));
+// 渲染界面（从实时数据获取）
+function updateDuelUI(d, isDefender) {
+  const myUid = Auth.users().find(u => u.id === me.id)?.uid;
+  const isChallenger = (d.challenger === myUid);
+  
+  const maxMyHp = (isChallenger ? d.a_power : d.b_power) * 3;
+  const maxOppHp = (isChallenger ? d.b_power : d.a_power) * 3;
+  const myHp = Math.max(0, isChallenger ? (d.a_hp ?? maxMyHp) : (d.b_hp ?? maxMyHp));
+  const oppHp = Math.max(0, isChallenger ? (d.b_hp ?? maxOppHp) : (d.a_hp ?? maxOppHp));
 
-    // 从存档里找对手名字
-    const oppUid = isChallenger ? d.defender : d.challenger;
-    const oppName = Auth.users().find(u => u.uid === oppUid)?.name || '对手';
+  const oppUid = isChallenger ? d.defender : d.challenger;
+  const oppName = Auth.users().find(u => u.uid === oppUid)?.name || '对手';
 
-    const renderHp = (name, current, max) => el('div', { style: 'text-align:center;flex:1;padding:0 5px' },
-      el('div', { textContent: name, style: 'font-weight:bold' }),
-      el('div', { className: 'hp-bar' }, el('div', { className: 'hp-fill' + (current/max < 0.3 ? ' dead' : current/max < 0.6 ? ' low' : ''), style: `width:${(current/max)*100}%` })),
-      el('div', { className: 'hint', textContent: `${Math.round(current)} / ${Math.round(max)}` })
-    );
-    $('duel-hp-area').replaceChildren(
-      renderHp(me.name + '（我）', myHp, maxMyHp),
-      el('div', { textContent: 'VS', style: 'font-weight:bold;color:var(--primary);margin-top:20px' }),
-      renderHp(oppName, oppHp, maxOppHp)
-    );
-    
-    // 渲染战斗日志
-    const logs = d.rounds || [];
-    $('duel-log').replaceChildren(...logs.map(l => {
-      const isMyAttack = l.who === myUid;
-      const skillName = ['普通攻击','强力猛击','终极必杀'][l.skill - 1];
-      return el('div', { style: isMyAttack ? 'color:var(--primary);margin-bottom:4px' : 'color:#d33;margin-bottom:4px' }, 
-        `${isMyAttack ? '👉 你' : '🔥 对方'}使用了【${skillName}】，${l.dmg > 0 ? `造成 ${Math.round(l.dmg)} 点伤害！` : '被闪避了！'}`);
-    }));
-    if(logs.length) $('duel-log').scrollTop = $('duel-log').scrollHeight;
-    
-    // 判断轮次
-    const isMyTurn = (logs.length % 2 === 0) ? isChallenger : !isChallenger;
-    const skillArea = $('skill-area');
-    
-    if (d.winner) {
-      skillArea.style.display = 'none';
-      $('duel-title').textContent = d.winner === myUid ? '🏆 你赢了！' : '💥 你输了，下次加油！';
-      clearInterval(duelInterval);
-    } else if (isMyTurn) {
-      skillArea.style.display = 'grid';
-      Array.from(skillArea.children).forEach(b => b.disabled = false);
-      $('duel-title').textContent = '🎯 轮到你出招了！';
-    } else {
-      skillArea.style.display = 'grid';
-      Array.from(skillArea.children).forEach(b => b.disabled = true);
-      $('duel-title').textContent = '⏳ 等待对方出招...';
-    }
-  } catch (e) { console.error(e); }
+  const renderHp = (name, current, max) => el('div', { style: 'text-align:center;flex:1;padding:0 5px' },
+    el('div', { textContent: name, style: 'font-weight:bold' }),
+    el('div', { className: 'hp-bar' }, el('div', { className: 'hp-fill' + (current/max < 0.3 ? ' dead' : current/max < 0.6 ? ' low' : ''), style: `width:${(current/max)*100}%` })),
+    el('div', { className: 'hint', textContent: `${Math.round(current)} / ${Math.round(max)}` })
+  );
+  $('duel-hp-area').replaceChildren(
+    renderHp(me.name + '（我）', myHp, maxMyHp),
+    el('div', { textContent: 'VS', style: 'font-weight:bold;color:var(--primary);margin-top:20px' }),
+    renderHp(oppName, oppHp, maxOppHp)
+  );
+  
+  const logs = d.rounds || [];
+  $('duel-log').replaceChildren(...logs.map(l => {
+    const isMyAttack = l.who === myUid;
+    const skillName = ['普通攻击','强力猛击','终极必杀'][l.skill - 1];
+    return el('div', { style: isMyAttack ? 'color:var(--primary);margin-bottom:4px' : 'color:#d33;margin-bottom:4px' }, 
+      `${isMyAttack ? '👉 你' : '🔥 对方'}使用了【${skillName}】，${l.dmg > 0 ? `造成 ${Math.round(l.dmg)} 点伤害！` : '被闪避了！'}`);
+  }));
+  if(logs.length) $('duel-log').scrollTop = $('duel-log').scrollHeight;
+  
+  const isMyTurn = (logs.length % 2 === 0) ? isChallenger : !isChallenger;
+  const skillArea = $('skill-area');
+  
+  if (d.winner) {
+    skillArea.style.display = 'none';
+    $('duel-title').textContent = d.winner === myUid ? '🏆 你赢了！' : '💥 你输了，下次加油！';
+    if (duelRealtimeChannel) Auth.sb.removeChannel(duelRealtimeChannel);
+  } else if (isMyTurn) {
+    skillArea.style.display = 'grid';
+    Array.from(skillArea.children).forEach(b => b.disabled = false);
+    $('duel-title').textContent = '🎯 轮到你出招了！';
+  } else {
+    skillArea.style.display = 'grid';
+    Array.from(skillArea.children).forEach(b => b.disabled = true);
+    $('duel-title').textContent = '⏳ 等待对方出招...';
+  }
 }
 
 async function useSkill(skill) {
@@ -974,7 +973,6 @@ async function useSkill(skill) {
   Array.from(skillArea.children).forEach(b => b.disabled = true);
   try {
     await Auth.duelAction(currentDuelId, skill);
-    pollDuelState(currentDuelId); // 立刻刷新一次，不用等 1.5 秒
   } catch (e) {
     toast('❌ ' + e.message);
     Array.from(skillArea.children).forEach(b => b.disabled = false);
