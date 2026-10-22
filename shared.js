@@ -17,7 +17,7 @@ const Auth = (() => {
   const CHECKIN = '签到', CHECKIN_REWARD = { coins: 10, stars: 1 };     // 老师给学生签到一科，学生自动得到的奖励
   const clone = x => JSON.parse(JSON.stringify(x));
   const ck = r => { if (r && r.error) throw new Error(r.error.message); return r; };
-  let U = [], C = [], N = [], T = [], RC = {}, SV = {}, PA = {}, H = [], WP = [], FR = [];
+  let U = [], C = [], N = [], T = [], RC = {}, SV = {}, PA = {}, H = [], WP = [], FR = [], DU = [];
   const LD = new Set([new Date().toLocaleDateString('sv')]);          // 已载入名单的日期
   const PH = {};                                                      // 等待上传的证明照片（dataURL）
   const uidOf = code => U.find(u => u.id === code)?.uid;
@@ -39,7 +39,8 @@ const Auth = (() => {
       sb.from('awards').select('student_id,coins,stars').eq('claimed', false),
       sb.from('hall_of_fame').select('*').order('score', { ascending: false }),   // 封神榜：表还没建时当作空，不影响其他功能
       sb.from('wall_posts').select('*').order('created_at', { ascending: false }).limit(100),   // 留言墙（同上）
-      sb.rpc('my_friends')                                                                       // 好友（同上）
+      sb.rpc('my_friends'),
+      sb.rpc('my_duels')                                                                       // 好友（同上）
     ]);
     rs.slice(0, 10).forEach(ck);
     const [p, c, tc, n, s, t, td, r, g, a] = rs.map(x => x.data);
@@ -49,6 +50,8 @@ const Auth = (() => {
       classId: x.class_id, body: x.body, time: Date.parse(x.created_at) }));
     FR = (rs[12].error ? [] : rs[12].data).map(x => ({ id: x.id, status: x.status, otherId: x.other_id, code: x.code, name: x.name,
       className: x.class_name, petLevel: x.pet_level, power: x.power, giftedToday: x.gifted_today }));
+    DU = (rs[13].error ? [] : rs[13].data).map(x => ({ id: x.id, time: Date.parse(x.created_at), iAmChallenger: x.i_am_challenger, oppName: x.opp_name,
+      win: x.win, myPower: x.my_power, oppPower: x.opp_power, rounds: x.rounds, myPet: x.my_pet, oppPet: x.opp_pet, unseen: x.unseen }));
     const tcm = {};
     tc.forEach(x => (tcm[x.teacher_id] ||= []).push(x.class_id));
     U = p.map(x => ({ uid: x.user_id, id: x.code, name: x.name, role: x.role, admin: x.is_admin, classId: x.class_id, classIds: tcm[x.user_id] || [] }));
@@ -190,7 +193,8 @@ const Auth = (() => {
         if (session) ck(await sb.from('game_saves').upsert({ user_id: session.user.id, data: obj, updated_at: new Date().toISOString(), ...(extra || {}) }));
       } catch (e) { console.warn('存档同步失败', e.message); }
     };
-    if (now) go(); else pushTimer = setTimeout(go, 1500);
+    if (now) return go();
+    pushTimer = setTimeout(go, 1500);
   }
   // ---- 留言墙：同班或全部班级 ----
   const wall = () => clone(WP);
@@ -210,6 +214,10 @@ const Auth = (() => {
   const friendRemove = id => rpc('friend_remove', { p_id: id });
   const sendGiftCoins = (otherId, amount) => rpc('send_gift_coins', { p_friend: otherId, p_amount: amount });
   const sendGiftItem = (otherId, name) => rpc('send_gift_item', { p_friend: otherId, p_name: name });
+  // ---- 好友单挑 ----
+  const duels = () => clone(DU);
+  const duelChallenge = otherId => rpc('duel_challenge', { p_friend: otherId });
+  const duelsSeen = async () => { await sb.rpc('duels_mark_seen'); };
   async function claimGiftItems() {                       // 领取好友送的配件
     const { data, error } = await sb.rpc('claim_gift_items');
     if (error) throw new Error(error.message);
@@ -291,7 +299,7 @@ const Auth = (() => {
     return data;
   }
 
-  return { sb, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGiftCoins, sendGiftItem, claimGiftItems, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
+  return { sb, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGiftCoins, sendGiftItem, claimGiftItems, duels, duelChallenge, duelsSeen, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
     users, classes, ready, session, login, logout, guard, START, SUBJECTS, KIND, saveKey,
     notices, saveNotices, topics, saveTopics, records, saveRecords, sub, setProof, delProof, proofUrl,
     grant, claimAwards, pendingAward, loadSave, fetchMySave, pushMySave };

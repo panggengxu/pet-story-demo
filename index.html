@@ -182,6 +182,9 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
         <div id="fr-req"></div>
         <div class="card-title" style="margin-top:8px">好友战力排行榜</div>
         <div id="rank-list"></div>
+        <div class="card-title" style="margin-top:12px">⚔️ 对战记录</div>
+        <div id="duel-list"></div>
+        <div class="hint" style="margin-top:6px">点好友旁边的“⚔️ 挑战”可以单挑：用双方出战宠物的战力对战，三局两胜，有运气成分，对方不用在线。每天最多挑战 10 次，其中最多 5 次有奖励（赢 10🪙+1⭐，输 2🪙），同一位好友每天只有第一次有奖励。</div>
         <div class="hint" style="margin-top:8px">可以送金币或配件给好友：送金币会扣掉你的金币，送配件会从你的背包里拿走。为防止刷礼物，每人每天最多送出 200 枚金币和 3 件配件。好友的战力在对方打开游戏时更新。</div>
       </div>
     </div>
@@ -204,6 +207,13 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
     <div id="gacha-reward-icon" style="font-size:4rem;margin:15px 0"></div>
     <div id="gacha-reward-name" style="font-weight:bold;font-size:1.1rem;margin-bottom:15px;color:var(--primary)"></div>
     <button class="btn-action btn-block" data-action="close">收入背包 🎒</button>
+  </div>
+</div>
+<div id="duel-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="单挑对战">
+  <div class="modal-box" style="text-align:left">
+    <h3 id="duel-title" style="margin-bottom:10px;color:var(--primary);text-align:center"></h3>
+    <div id="duel-body"></div>
+    <button class="btn-action btn-block" style="margin-top:12px" data-action="close">关闭</button>
   </div>
 </div>
 <div id="gift-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="送礼物">
@@ -256,8 +266,7 @@ const PET_TYPES = [
   { id: 'fire',   name: '炎系小恐龙', weight: 1, stages: ['pet/pet-fire.jpg'] },
   { id: 'plant',  name: '萝卜兔',     weight: 1, stages: ['pet/pet-plant.jpg'] },
   { id: 'sky',    name: '天空飞熊',   weight: 1, stages: ['pet/pet-sky.jpg'] },
-  { id: 'shadow', name: '暗影雷狼',   weight: 1, stages: ['pet/暗影雷狼.jpg'] },
-  { id: 'beluga', name: '雪羽',   weight: 2, stages: ['pet/雪羽.jpg'] }
+  { id: 'shadow', name: '暗影雷狼',   weight: 1, stages: ['pet/暗影雷狼.jpg'] }
 ];
 const petType = () => PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
 const petImage = lv => { const st = petType().stages; return st[Math.min(lv, st.length) - 1]; };
@@ -330,7 +339,7 @@ function load(remote) {                                   // remote：云端存�
   if (p.day !== today()) { p.day = today(); p.feed = p.play = p.pat = 0; }
 }
 let synced = false;
-const pushSave = now => Auth.pushMySave(state, now, { power: calcPower(), pet_level: state.petLevel });   // 战力一起上传，好友排行榜用                                        // 云端存档读取完成后才允许上传，避免旧数据覆盖云端
+const pushSave = now => Auth.pushMySave(state, now, { power: calcPower(), pet_level: state.petLevel, pet_type: state.petType });   // 战力一起上传，好友排行榜用                                        // 云端存档读取完成后才允许上传，避免旧数据覆盖云端
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch {}
   if (synced) pushSave(false);
@@ -358,7 +367,7 @@ const closeModals = () => document.querySelectorAll('.modal-overlay').forEach(m 
 function render() {
   $('coins').textContent = state.coins;
   $('stars').textContent = state.stars;
-  renderPet(); renderPetBox(); renderCare(); renderRank(); renderMessages(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
+  renderPet(); renderPetBox(); renderCare(); renderRank(); renderDuels(); renderMessages(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
   save();
 }
 const gearPower = it => it ? (POOL.find(p => p.name === it.name)?.power ?? 0) : 0;
@@ -384,8 +393,8 @@ function renderRank() {                                    // 好友战力排行
   ].sort((a, b) => b.power - a.power);
   $('rank-list').replaceChildren(...rows.map((r, i) => el('div', { className: 'rank-item', style: r.me ? 'background:#eeeaff;border-radius:8px' : '' },
     el('span', { textContent: `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name}${r.cls ? '（' + r.cls + '）' : ''} · 战力 ${r.power}` }),
-    r.me ? '' : el('span', { style: 'display:flex;gap:4px;align-items:center' },
-      btn('🎁 送礼物', 'giftFriend', { id: r.other }), btn('删除', 'removeFriend', { id: r.id }, 'unequip')))));
+    r.me ? '' : el('span', { style: 'display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end' },
+      btn('⚔️ 挑战', 'duelFriend', { id: r.other }), btn('🎁 送礼物', 'giftFriend', { id: r.other }), btn('删除', 'removeFriend', { id: r.id }, 'unequip')))));
   if (rows.length === 1) $('rank-list').append(el('div', { className: 'hint', textContent: '还没有好友，输入同学的学号加好友，一起比拼战力吧！' }));
   const box = $('fr-req'); box.replaceChildren();
   fr.filter(f => f.status === 'incoming').forEach(f => box.append(el('div', { className: 'rank-item' },
@@ -746,6 +755,17 @@ const ACTIONS = {
     try { await Auth.friendRemove(id); } catch (e) { return toast('❌ ' + e.message); }
     renderRank();
   },
+  async duelFriend({ id }) {
+    const f = Auth.friends().find(x => x.otherId === id);
+    if (!f || duelBusy) return;
+    if (state.petLevel < 1) return toast('你还没有出战的宠物，先孵化或让一只宠物出战吧');
+    duelBusy = true;
+    let r;
+    try { await pushSave(true); r = await Auth.duelChallenge(id); }   // 先把我最新的战力同步上去，再对战
+    catch (e) { duelBusy = false; return toast('❌ ' + e.message); }
+    duelBusy = false; showDuel(r, f); renderDuels();
+    claim().then(render).catch(() => {});                  // 对战奖励马上领取
+  },
   giftFriend({ id }) { const f = Auth.friends().find(x => x.otherId === id); if (f) openGift(f); },
   async giftSendCoins() {
     if (giftBusy || !giftTo) return;
@@ -802,6 +822,47 @@ $('proof-file').addEventListener('change', async e => {
   catch { toast('⚠️ 这张图片无法读取，请换一张'); e.target.value = ''; }
 });
 load(); render(); renderMessages();                        // 先用本机备份快速显示
+// ===== 好友单挑 =====
+let duelBusy = false;
+function renderDuels() {                                   // 对战记录
+  const box = $('duel-list');
+  if (!box) return;
+  const list = Auth.duels().slice(0, 6); box.replaceChildren();
+  if (!list.length) return box.append(el('div', { className: 'hint', textContent: '还没有对战记录，点好友旁边的“⚔️ 挑战”试试！' }));
+  list.forEach(d => box.append(el('div', { className: 'rank-item' },
+    el('span', { textContent: `${d.win ? '🏆' : '💥'} ${d.iAmChallenger ? '你挑战了 ' + d.oppName : d.oppName + ' 挑战了你'}：你${d.win ? '赢了' : '输了'}` }),
+    el('span', { className: 'hint', textContent: `${d.myPower} vs ${d.oppPower}` }))));
+}
+async function notifyDuels() {                             // 别人挑战了我（我不在线时发生的），打开页面时告诉我结果
+  const un = Auth.duels().filter(d => d.unseen);
+  if (!un.length) return;
+  toast('⚔️ ' + un.map(d => `${d.oppName} 挑战了你，你${d.win ? '赢了' : '输了'}`).join('；'));
+  await Auth.duelsSeen();
+}
+function showDuel(r, f) {                                  // 对战动画：回合逐个出现，最后显示结果
+  const side = (type, level, name, power) => el('div', { style: 'text-align:center;flex:1;min-width:0' },
+    el('img', { src: petImageOf({ type, level }), alt: '', style: 'width:72px;height:72px;object-fit:contain;border-radius:12px;background:var(--soft)' }),
+    el('div', { textContent: name, style: 'font-weight:700;font-size:.85rem;overflow-wrap:anywhere' }),
+    el('div', { className: 'hint', textContent: `战力 ${power}` }));
+  $('duel-title').textContent = '⚔️ 单挑对战';
+  $('duel-body').replaceChildren(
+    el('div', { style: 'display:flex;align-items:center;gap:6px' },
+      side(state.petType, state.petLevel, me.name, r.my_power), el('b', { textContent: 'VS' }), side(r.opp_pet, f.petLevel || 1, r.opp_name, r.opp_power)),
+    el('div', { id: 'duel-rounds', style: 'margin-top:12px;font-size:.88rem' }),
+    el('div', { id: 'duel-result', style: 'margin-top:10px;font-weight:700;text-align:center;font-size:1rem' }));
+  openModal('duel-modal');
+  r.rounds.forEach((x, i) => setTimeout(() => $('duel-rounds')?.append(el('div', { className: 'rank-item',
+    textContent: `第 ${i + 1} 回合：你 ${x.a} · 对方 ${x.b}　${x.a >= x.b ? '✅ 你赢' : '❌ 对方赢'}` })), 700 * (i + 1)));
+  setTimeout(() => {
+    const box = $('duel-result');
+    if (!box) return;
+    box.textContent = r.win ? '🏆 你赢了！' : '💥 你输了，下次加油！';
+    box.append(el('div', { className: 'hint', textContent: r.rewarded
+      ? `奖励：${r.coins}🪙${r.stars ? ' ' + r.stars + '⭐' : ''}（已发到你的账户）`
+      : '今天的奖励次数已用完，或今天已经从这位好友这里拿过奖励了（对战仍然有效）' }));
+  }, 700 * (r.rounds.length + 1));
+}
+
 // ===== 送礼物：送金币（扣自己的金币）/ 送配件（从自己的背包拿走）=====
 let giftTo = null, giftBusy = false;
 function openGift(f) {
@@ -849,6 +910,7 @@ function resetState() {
 })();
 
 async function claim() {                                   // 领取：老师发的、签到的、好友送的金币，以及好友送的配件
+  notifyDuels().catch(() => {});
   const got = await Auth.claimAwards(), items = await Auth.claimGiftItems().catch(() => []);
   const c = got.reduce((n, x) => n + x.coins, 0), t = got.reduce((n, x) => n + x.stars, 0), notes = [];
   if (got.length) { state.coins = Math.max(0, state.coins + c); state.stars = Math.max(0, state.stars + t); notes.push(`${c}🪙 ${t}⭐`); }
