@@ -428,7 +428,14 @@ function renderDuels() {
 function renderRank() {                                    // 好友战力排行榜 + 好友申请
   const fr = Auth.friends();
   const rows = [{ name: me.name + '（我）', power: calcPower(), me: true },
-    ...fr.filter(f => f.status === 'accepted').map(f => ({ name: f.name, cls: f.className, power: f.power, id: f.id, other: f.otherId, gifted: f.giftedToday }))
+    ...fr.filter(f => f.status === 'accepted').map(f => {
+  // 暴力去底层的 SV 里找一下这个好友有没有 last_seen
+  let isOnline = false;
+  if (Auth.SV && Auth.SV['last_seen_' + f.code]) {
+    isOnline = (Date.now() - Date.parse(Auth.SV['last_seen_' + f.code])) < 120000;
+  }
+  return { name: f.name, cls: f.className, power: f.power, id: f.id, other: f.otherId, isOnline };
+})
   ].sort((a, b) => b.power - a.power);
   $('rank-list').replaceChildren(...rows.map((r, i) => el('div', { className: 'rank-item', style: r.me ? 'background:#eeeaff;border-radius:8px' : '' },
         el('span', { style: 'display:flex;align-items:center;gap:6px' }, 
