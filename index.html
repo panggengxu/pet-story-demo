@@ -241,6 +241,23 @@ const PET_STAGES = [
   { name: 'AI 幻兽伙伴', img: 'pet/Ender dragon 2.jpg', label: 'Lv.2 觉醒高阶形态 ✨', needStars: 15 },
   { name: 'AI 幻兽伙伴', img: 'pet/Ender dragon 3.jpg', label: 'Lv.3 终极神兽形态 👑', needStars: 30 }
 ];
+// 宠物品种：破蛋时按权重随机抽一个（weight 越大越容易抽到，想让某只更稀有就把它的 weight 调小，例如 0.3）
+// stages 是 Lv.1 / Lv.2 / Lv.3 的图片；只有一张图的品种，三个等级都显示这一张，以后补了图，在 stages 里按顺序加路径就行
+const PET_TYPES = [
+  { id: 'ender',  name: '末影龙',     weight: 1, stages: ['pet/Ender dragon 1.jpg', 'pet/Ender dragon 2.jpg', 'pet/Ender dragon 3.jpg'] },
+  { id: 'cosmic', name: '星空猫咪',   weight: 1, stages: ['pet/pet-cosmic.jpg'] },
+  { id: 'fire',   name: '炎系小恐龙', weight: 1, stages: ['pet/pet-fire.jpg'] },
+  { id: 'plant',  name: '萝卜兔',     weight: 1, stages: ['pet/pet-plant.jpg'] },
+  { id: 'sky',    name: '天空飞熊',   weight: 1, stages: ['pet/pet-sky.jpg'] },
+  { id: 'shadow', name: '暗影雷狼',   weight: 1, stages: ['pet/暗影雷狼.jpg'] }
+];
+const petType = () => PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
+const petImage = lv => { const st = petType().stages; return st[Math.min(lv, st.length) - 1]; };
+function pickPet() {
+  const total = PET_TYPES.reduce((n, t) => n + t.weight, 0);
+  let r = Math.random() * total;
+  return PET_TYPES.find(t => (r -= t.weight) < 0) || PET_TYPES[0];
+}
 const MUSIC = [
   { cat: '⚔️ 进击的巨人 (Attack on Titan)', songs: [
     { id: 101, title: 'Ashes on The Fire (主旋律)', price: 280, file: 'audio/AOT/Ashes on The Fire.mp3' },
@@ -274,12 +291,13 @@ const SAYS = {
 const today = () => new Date().toLocaleDateString('sv'); // 本地日期 YYYY-MM-DD
 const state = {
   coins: 500, stars: 10, completed: [], date: today(), unlockedMusic: [], inventory: [],
-  equipped: Object.fromEntries(SLOTS.map(s => [s, null])), petLevel: 0, messages: [],
+  equipped: Object.fromEntries(SLOTS.map(s => [s, null])), petLevel: 0, petType: '', messages: [],
   pet: { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0 }
 };
 function load(remote) {                                   // remote：云端存档；没有就用本机备份
   try { Object.assign(state, remote || JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); } catch {}
   if (!PET_STAGES[state.petLevel]) state.petLevel = 0;
+  if (state.petLevel > 0 && !PET_TYPES.some(t => t.id === state.petType)) state.petType = 'ender';   // 以前孵化的都是末影龙
   if (state.date !== today()) { state.completed = []; state.date = today(); } // 每日重置打卡
   const p = state.pet = { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0, ...state.pet };
   const h = Math.floor((Date.now() - p.tick) / 36e5);   // 每过 1 小时，心情 -3
@@ -353,12 +371,13 @@ function renderRank() {                                    // 好友战力排行
 }
 function renderPet() {
   const stage = PET_STAGES[state.petLevel], img = $('pet-img');
-  $('pet-name').textContent = stage.name;
+  const hatched = state.petLevel > 0, pic = hatched ? petImage(state.petLevel) : stage.img;
+  $('pet-name').textContent = hatched ? petType().name : stage.name;
   $('pet-rank-text').textContent = stage.label;
-  if (img.dataset.src !== stage.img) {            // 仅在图片变化时才赋值，避免重复请求
-    img.dataset.src = stage.img;
+  if (img.dataset.src !== pic) {            // 仅在图片变化时才赋值，避免重复请求
+    img.dataset.src = pic;
     img.onerror = () => { img.onerror = null; img.src = FALLBACK_IMG; };
-    img.src = stage.img;
+    img.src = pic;
   }
   const b = $('pet-btn'), next = PET_STAGES[state.petLevel + 1];
   b.disabled = !next && state.petLevel > 0;
@@ -522,7 +541,7 @@ const ACTIONS = {
   cheat() { state.coins += 500; render(); toast('🪙 已增加 500 金币（调试）'); },
   hatch() {
     if (state.coins < HATCH_COST) return toast(`❌ 金币不足，孵化需要 ${HATCH_COST} 金币`);
-    state.coins -= HATCH_COST; state.petLevel = 1; state.pet.mood = 70; state.pet.tick = Date.now(); render(); toast('🎉 咔嚓！宠物蛋破壳，你的专属宠物诞生啦！');
+    state.coins -= HATCH_COST; state.petLevel = 1; state.petType = pickPet().id; state.pet.mood = 70; state.pet.tick = Date.now(); render(); toast(`🎉 咔嚓！你孵出了「${petType().name}」！`);
   },
   evolve() {
     const next = PET_STAGES[state.petLevel + 1];
