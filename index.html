@@ -839,28 +839,123 @@ async function notifyDuels() {                             // 别人挑战了我
   toast('⚔️ ' + un.map(d => `${d.oppName} 挑战了你，你${d.win ? '赢了' : '输了'}`).join('；'));
   await Auth.duelsSeen();
 }
-function showDuel(r, f) {                                  // 对战动画：回合逐个出现，最后显示结果
-  const side = (type, level, name, power) => el('div', { style: 'text-align:center;flex:1;min-width:0' },
-    el('img', { src: petImageOf({ type, level }), alt: '', style: 'width:72px;height:72px;object-fit:contain;border-radius:12px;background:var(--soft)' }),
-    el('div', { textContent: name, style: 'font-weight:700;font-size:.85rem;overflow-wrap:anywhere' }),
-    el('div', { className: 'hint', textContent: `战力 ${power}` }));
-  $('duel-title').textContent = '⚔️ 单挑对战';
+function showDuel(r, f) {
+  // 初始血量：战力越高，血条越厚 (最低 100 血)
+  let hpA = Math.max(r.my_power * 3, 100);
+  let hpB = Math.max(r.opp_power * 3, 100);
+  const maxHpA = hpA, maxHpB = hpB;
+  let isAnimating = true;
+
+  const makeSide = (type, level, name, power, isMe) => {
+    const img = el('img', { src: petImageOf({ type, level }), alt: '', 
+      style: 'width:100px;height:100px;object-fit:contain;border-radius:12px;transition:transform 0.2s',
+      id: isMe ? 'pet-a' : 'pet-b' });
+    const hpText = el('div', { id: isMe ? 'hp-text-a' : 'hp-text-b', className: 'hint', textContent: `HP ${Math.round(maxHpA)}/${Math.round(maxHpA)}` });
+    const hpBar = el('div', { className: 'hp-bar' }, el('div', { id: isMe ? 'hp-fill-a' : 'hp-fill-b', className: 'hp-fill', style: 'width:100%' }));
+    const dmg = el('div', { id: isMe ? 'dmg-a' : 'dmg-b', className: 'dmg-text' });
+    
+    return el('div', { style: 'text-align:center;flex:1;min-width:0;position:relative' },
+      dmg, img,
+      el('div', { textContent: name, style: 'font-weight:700;font-size:.85rem;margin-top:4px' }),
+      el('div', { className: 'hint', textContent: `战力 ${power}` }),
+      hpText, hpBar
+    );
+  };
+
+  $('duel-title').textContent = '⚔️ 宝可梦式对战';
   $('duel-body').replaceChildren(
-    el('div', { style: 'display:flex;align-items:center;gap:6px' },
-      side(state.petType, state.petLevel, me.name, r.my_power), el('b', { textContent: 'VS' }), side(r.opp_pet, f.petLevel || 1, r.opp_name, r.opp_power)),
-    el('div', { id: 'duel-rounds', style: 'margin-top:12px;font-size:.88rem' }),
-    el('div', { id: 'duel-result', style: 'margin-top:10px;font-weight:700;text-align:center;font-size:1rem' }));
+    el('div', { style: 'display:flex;align-items:center;gap:10px;margin-bottom:16px' },
+      makeSide(state.petType, state.petLevel, me.name, r.my_power, true), 
+      el('b', { textContent: 'VS', style: 'font-size:1.5rem;color:var(--primary);font-style:italic' }), 
+      makeSide(r.opp_pet, f.petLevel || 1, r.opp_name, r.opp_power, false)),
+    el('div', { id: 'duel-log', style: 'height:100px;overflow-y:auto;background:var(--soft);padding:8px;border-radius:8px;font-size:.85rem;line-height:1.5' },
+      el('div', { textContent: `野生的 ${r.opp_name} 向你发起了挑战！` })
+    ),
+    el('div', { id: 'duel-result', style: 'margin-top:12px;font-weight:700;text-align:center;font-size:1.1rem' })
+  );
   openModal('duel-modal');
-  r.rounds.forEach((x, i) => setTimeout(() => $('duel-rounds')?.append(el('div', { className: 'rank-item',
-    textContent: `第 ${i + 1} 回合：你 ${x.a} · 对方 ${x.b}　${x.a >= x.b ? '✅ 你赢' : '❌ 对方赢'}` })), 700 * (i + 1)));
-  setTimeout(() => {
-    const box = $('duel-result');
-    if (!box) return;
-    box.textContent = r.win ? '🏆 你赢了！' : '💥 你输了，下次加油！';
-    box.append(el('div', { className: 'hint', textContent: r.rewarded
+
+  const log = (msg) => {
+    const box = $('duel-log');
+    box.append(el('div', { textContent: msg }));
+    box.scrollTop = box.scrollHeight;
+  };
+
+  const updateHp = (isMe, newHp) => {
+    const fill = $(isMe ? 'hp-fill-a' : 'hp-fill-b');
+    const text = $(isMe ? 'hp-text-a' : 'hp-text-b');
+    const pct = Math.max(0, newHp / (isMe ? maxHpA : maxHpB)) * 100;
+    fill.style.width = pct + '%';
+    fill.className = 'hp-fill' + (pct < 20 ? ' dead' : pct < 50 ? ' low' : '');
+    text.textContent = `HP ${Math.max(0, Math.round(newHp))}/${Math.round(isMe ? maxHpA : maxHpB)}`;
+  };
+
+  const showDmg = (isMe, val) => {
+    const dmg = $(isMe ? 'dmg-a' : 'dmg-b');
+    dmg.textContent = `-${val}`;
+    dmg.classList.remove('show');
+    void dmg.offsetWidth; // 触发重绘
+    dmg.classList.add('show');
+    setTimeout(() => dmg.classList.remove('show'), 600);
+    $(isMe ? 'pet-a' : 'pet-b').classList.add('hit');
+    setTimeout(() => $(isMe ? 'pet-a' : 'pet-b').classList.remove('hit'), 400);
+  };
+
+  // 开始逐回合播放动画
+  setTimeout(async () => {
+    for (let i = 0; i < r.rounds.length; i++) {
+      if (!document.getElementById('duel-log')) return; // 被手动关闭了
+      
+      const round = r.rounds[i];
+      // 计算本回合伤害（按比例）
+      const baseDmg = 30; // 固定基础伤害增加刺激感
+      const dmgToB = Math.round(baseDmg + (round.a - round.b) * 0.5 + Math.random() * 10);
+      const dmgToA = Math.round(baseDmg + (round.b - round.a) * 0.5 + Math.random() * 10);
+
+      log(`👉 第 ${i + 1} 回合：你发起了攻击！`);
+      if (dmgToB > 0) {
+        hpB -= dmgToB;
+        updateHp(false, hpB);
+        showDmg(false, dmgToB);
+        log(`你的宠物造成了 ${dmgToB} 点伤害！`);
+      } else {
+        log(`你的宠物被闪避了。`);
+      }
+
+      await new Promise(res => setTimeout(res, 800));
+      if (!document.getElementById('duel-log')) return;
+
+      if (hpB <= 0) break;
+
+      log(`🔥 对方反击！`);
+      if (dmgToA > 0) {
+        hpA -= dmgToA;
+        updateHp(true, hpA);
+        showDmg(true, dmgToA);
+        log(`对方的宠物造成了 ${dmgToA} 点伤害！`);
+      } else {
+        log(`对方扑空了。`);
+      }
+
+      await new Promise(res => setTimeout(res, 800));
+      if (hpA <= 0) break;
+    }
+
+    // 结算
+    const resultBox = $('duel-result');
+    if (!resultBox) return;
+    isAnimating = false;
+    
+    // 如果按照真实回合血量没扣完，强行扣完
+    if (hpB > 0) { updateHp(false, 0); showDmg(false, hpB); }
+    if (!r.win && hpA > 0) { updateHp(true, 0); showDmg(true, hpA); }
+    if (r.win && hpA > 0) { updateHp(true, hpA); }
+    
+    resultBox.textContent = r.win ? '🏆 你赢了！' : '💥 你输了，下次加油！';
+    resultBox.append(el('div', { className: 'hint', textContent: r.rewarded
       ? `奖励：${r.coins}🪙${r.stars ? ' ' + r.stars + '⭐' : ''}（已发到你的账户）`
       : '今天的奖励次数已用完，或今天已经从这位好友这里拿过奖励了（对战仍然有效）' }));
-  }, 700 * (r.rounds.length + 1));
+  }, 500); // 稍微等弹窗出来一点再开始
 }
 
 // ===== 送礼物：送金币（扣自己的金币）/ 送配件（从自己的背包拿走）=====
@@ -939,6 +1034,27 @@ Auth.ready.then(async () => {
   document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) pushSave(true); } else poll(); });
   window.addEventListener('pagehide', () => { if (synced) pushSave(true); });
 }).catch(() => {});
+  /* 宠物对战动画特效 */
+@keyframes shake {
+  0% { transform: translate(1px, 1px) rotate(0deg); }
+  10% { transform: translate(-1px, -2px) rotate(-1deg); }
+  20% { transform: translate(-3px, 0px) rotate(1deg); }
+  30% { transform: translate(3px, 2px) rotate(0deg); }
+  40% { transform: translate(1px, -1px) rotate(1deg); }
+  50% { transform: translate(-1px, 2px) rotate(-1deg); }
+  60% { transform: translate(-3px, 1px) rotate(0deg); }
+  70% { transform: translate(3px, 1px) rotate(-1deg); }
+  80% { transform: translate(-1px, -1px) rotate(1deg); }
+  90% { transform: translate(1px, 2px) rotate(0deg); }
+  100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+.hit { animation: shake 0.4s; }
+.hp-bar { height: 10px; background: #eee; border-radius: 5px; overflow: hidden; margin-top: 4px; }
+.hp-fill { height: 100%; background: #05cd99; transition: width 0.3s; border-radius: 5px; }
+.hp-fill.low { background: #ffb800; }
+.hp-fill.dead { background: #ff4d4d; }
+.dmg-text { position: absolute; color: #ff4d4d; font-weight: bold; font-size: 1.5rem; pointer-events: none; opacity: 0; transform: translateY(0); transition: all 0.6s; text-shadow: 1px 1px 2px #fff; }
+.dmg-text.show { opacity: 1; transform: translateY(-40px); }
 </script>
 </body>
 </html>
