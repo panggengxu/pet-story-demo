@@ -372,6 +372,9 @@ function save() {
 
 // ===== 工具 =====
 const $ = id => document.getElementById(id);
+let currentDuelId = null;
+let duelInterval = null;
+let duelBusy = false;
 let toastTimer;
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -392,7 +395,7 @@ const closeModals = () => document.querySelectorAll('.modal-overlay').forEach(m 
 function render() {
   $('coins').textContent = state.coins;
   $('stars').textContent = state.stars;
-  renderPet(); renderPetBox(); renderCare(); renderRank(); renderDuels(); renderMessages(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
+  renderPet(); renderPetBox(); renderCare(); renderRank();  renderMessages(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
   save();
 }
 const gearPower = it => it ? (POOL.find(p => p.name === it.name)?.power ?? 0) : 0;
@@ -411,6 +414,17 @@ function renderCare() {
     const b = $('btn-' + k); b.textContent = `${t} ${p[k]}/${LIMITS[k]}`; b.disabled = p[k] >= LIMITS[k];
   });
 }
+
+function renderDuels() {
+  const box = $('duel-list');
+  if (!box) return;
+  const list = Auth.duels().slice(0, 6); box.replaceChildren();
+  if (!list.length) return box.append(el('div', { className: 'hint', textContent: '还没有对战记录，点好友旁边的“⚔️ 挑战”试试！' }));
+  list.forEach(d => box.append(el('div', { className: 'rank-item' },
+    el('span', { textContent: `${d.win ? '🏆' : '💥'} ${d.iAmChallenger ? '你挑战了 ' + d.oppName : d.oppName + ' 挑战了你'}：你${d.win ? '赢了' : '输了'}` }),
+    el('span', { className: 'hint', textContent: `${d.myPower} vs ${d.oppPower}` }))));
+}
+
 function renderRank() {                                    // 好友战力排行榜 + 好友申请
   const fr = Auth.friends();
   const rows = [{ name: me.name + '（我）', power: calcPower(), me: true },
@@ -849,9 +863,7 @@ $('proof-file').addEventListener('change', async e => {
 load(); render(); renderMessages();                        // 先用本机备份快速显示
 
 // ===== 实时对战系统 =====
-let currentDuelId = null;
-let duelInterval = null;
-let duelBusy = false;
+
 
 async function triggerDuelFriend({ id }) {
   if (duelBusy) return;
