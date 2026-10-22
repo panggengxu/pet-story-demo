@@ -224,11 +224,13 @@ const Auth = (() => {
   const friendRemove = id => rpc('friend_remove', { p_id: id });
   const sendGiftCoins = (otherId, amount) => rpc('send_gift_coins', { p_friend: otherId, p_amount: amount });
   const sendGiftItem = (otherId, name) => rpc('send_gift_item', { p_friend: otherId, p_name: name });
-  // ---- 好友单挑 ----
+    // ---- 好友单挑 ----
   const duels = () => clone(DU);
-    const inviteDuel = otherId => rpc('duel_invite', { p_friend: otherId });
+  const inviteDuel = otherId => rpc('duel_invite', { p_friend: otherId });
   const duelAction = (duelId, skill) => rpc('duel_action', { p_duel_id: duelId, p_skill: skill });
-  const duelsSeen = async () => { await sb.rpc('duels_mark_seen'); };
+  // 删除旧的 duelsSeen，换成更新对战状态
+  const duelUpdateHP = (duelId, aHp, bHp, winner) => rpc('duel_update_hp', { p_duel_id: duelId, p_a_hp: aHp, p_b_hp: bHp, p_winner: winner });
+  
   const updateHeartbeat = () => {
     sb.auth.getUser().then(({data: {user}}) => {
       if (user) sb.from('game_saves').update({ last_seen: new Date().toISOString() }).eq('user_id', user.id);
@@ -315,7 +317,7 @@ const Auth = (() => {
     return data;
   }
 
-  return { sb, SV, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGiftCoins, sendGiftItem, claimGiftItems, duels, inviteDuel, duelAction, updateHeartbeat, duelsSeen, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
+  return { sb, SV, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGiftCoins, sendGiftItem, claimGiftItems, duels, inviteDuel, duelAction, duelUpdateHP, updateHeartbeat, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
     users, classes, ready, session, login, logout, guard, START, SUBJECTS, KIND, saveKey,
     notices, saveNotices, topics, saveTopics, records, saveRecords, sub, setProof, delProof, proofUrl,
     grant, claimAwards, pendingAward, loadSave, fetchMySave, pushMySave };
