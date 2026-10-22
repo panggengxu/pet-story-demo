@@ -706,11 +706,15 @@ const ACTIONS = {
     $('gacha-reward-name').textContent = `${reward.rarity} · ${reward.name}（战力 +${reward.power}）` + (dup ? ` 🔁 重复！可分解换 ${SELL[reward.rarity]}🪙` : '');
     openModal('gacha-modal');
   },
-      close() {
-    if (currentDuelId && !duelBusy) {
+        close() {
+    // 只有在对战弹窗里点关闭，才提示逃跑
+    const isDuelModal = document.getElementById('duel-modal').classList.contains('open');
+    
+    if (isDuelModal && currentDuelId && !duelBusy) {
       if (!confirm('逃跑会判负，确定要关闭吗？')) return;
-      // 逃跑逻辑可以这里写，目前简单点，直接关
     }
+    
+    if (duelInterval) clearInterval(duelInterval);
     closeModals();
   },
   previewSong({ id }) { playSong(SONGS.find(s => s.id == id), true); toast(`🎧 开始 ${PREVIEW_SECONDS} 秒免费试听`); },
