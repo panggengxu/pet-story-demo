@@ -874,11 +874,16 @@ load(); render(); renderMessages();                        // 先用本机备份
 
 async function triggerDuelFriend({ id }) {
   if (duelBusy) return;
+  
+  // 强行去好友列表里找一遍，确保拿到的绝对是一个合法的 UUID
+  const f = Auth.friends().find(x => x.otherId === id) || Auth.friends().find(x => x.id === id);
+  const realUuid = f ? f.otherId : id;
+
   duelBusy = true;
   try {
-    await pushSave(true); // 更新自己的最后在线时间
-    const duelId = await Auth.inviteDuel(id);
-    openDuelRoom(duelId, false); // 自己是挑战者
+    await pushSave(true);
+    const duelId = await Auth.inviteDuel(realUuid); // 传入真正的 UUID
+    openDuelRoom(duelId, false);
   } catch (e) {
     toast('❌ ' + e.message);
   } finally {
