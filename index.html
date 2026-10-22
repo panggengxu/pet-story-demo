@@ -170,7 +170,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
         </div>
         <textarea id="msg-input" maxlength="200" aria-label="留言内容" placeholder="写下你的学习心得，或给同学的鼓励..."></textarea>
         <button class="btn-action" data-action="post">发布留言</button>
-        <div id="msg-list" style="margin-top:12px;font-size:.85rem"></div>
+        <div id="msg-list" style="margin-top:12px;font-size:.85rem;max-height:460px;overflow-y:auto"></div>
       </div>
       <div class="card">
         <div class="card-title">FRIENDS</div>
@@ -492,9 +492,10 @@ function renderMusic() {
     });
   });
 }
+let wallShown = 15;                                        // 留言墙默认只显示最新 15 条，点“查看更多”再多看
 function renderMessages() {                                // 留言墙：同班和全部班级的留言（纯文本显示，防 XSS）
   const box = $('msg-list'), uid = Auth.users().find(u => u.id === me.id)?.uid; box.replaceChildren();
-  const posts = Auth.wall().slice(0, 50);
+  const all = Auth.wall(), posts = all.slice(0, wallShown);
   if (!posts.length) return box.append(el('div', { className: 'hint', textContent: '还没有留言，来写第一条吧！' }));
   posts.forEach(p => box.append(el('div', { className: 'msg-item' },
     el('div', { style: 'display:flex;justify-content:space-between;gap:6px;align-items:center' },
@@ -502,6 +503,7 @@ function renderMessages() {                                // 留言墙：同班
         el('span', { className: 'hint', style: 'font-size:.75rem', textContent: `　${p.classId ? '同班' : '🌐 全部班级'}　${new Date(p.time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` })),
       p.authorId === uid ? btn('删除', 'delPost', { id: p.id }, 'unequip') : ''),
     el('div', { textContent: p.body, style: 'margin-top:2px;overflow-wrap:anywhere' }))));
+  if (all.length > wallShown) box.append(btn(`查看更多（还有 ${all.length - wallShown} 条）`, 'moreWall', {}, 'btn-action btn-block'));
 }
 
 // ===== 行为 =====
@@ -568,6 +570,7 @@ const ACTIONS = {
     }
     playSong(s, false);
   },
+  moreWall() { wallShown += 15; renderMessages(); },
   async post() {
     const input = $('msg-input'), text = input.value.trim(), all = $('msg-scope').value === 'all';
     if (!text) return toast('请先写点内容再发布');
@@ -698,37 +701,6 @@ Auth.ready.then(async () => {
   document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) pushSave(true); } else poll(); });
   window.addEventListener('pagehide', () => { if (synced) pushSave(true); });
 }).catch(() => {});
-  // 1. 定义你的 4 只初阶随机宠物盲盒池（请确保图片路径和你在 GitHub 仓库里存放的路径一致）
-const petPool = [
-  { name: '炎系小恐龙', rank: 'Lv.1 初阶萌态', image: './pet/pet-fire.jpg' },
-  { name: '萝卜兔',     rank: 'Lv.1 初阶萌态', image: './pet/pet-plant.jpg' },
-  { name: '星空系猫咪', rank: 'Lv.1 初阶萌态', image: './pet/pet-cosmic.jpg' },
-  { name: '天空系飞马', rank: 'Lv.1 初阶萌态', image: './pet/pet-sky.jpg' }
-];
-
-// 2. 绑定你截图里看到的真实按钮 ID: 'pet-btn'
-const petBtn = document.getElementById('pet-btn');
-
-if (petBtn) {
-  petBtn.addEventListener('click', async () => {
-    // --- 这里保留你原本扣除 50 金币、请求 Supabase 的逻辑 ---
-    // 例如：let success = await deductCoins(50); if (!success) return;
-
-    // --- 核心随机盲盒抽取 ---
-    const randomIndex = Math.floor(Math.random() * petPool.length);
-    const chosenPet = petPool[randomIndex];
-
-    // --- 把随机抽到的结果填入你源码里的对应 ID ---
-    document.getElementById('pet-name').innerText = chosenPet.name;
-    document.getElementById('pet-rank-text').innerText = chosenPet.rank;
-    document.getElementById('pet-img').src = chosenPet.image;
-
-    // 抽完后，把按钮文字变成喂食/互动，或者隐藏/切换状态
-    petBtn.innerText = '喂食 (-5 💰)';
-    
-    // 如果需要把宠物名字和状态同步存进 Supabase 数据库，也可以在这里执行一次 update
-  });
-}
 </script>
 </body>
 </html>

@@ -151,13 +151,13 @@ td.act{display:flex;gap:6px}
   <section class="card">
     <details>
       <summary style="cursor:pointer;font-weight:700;font-size:1.05rem">💬 留言墙管理（查看、删除不当留言）</summary>
-      <div style="margin:8px 0;font-size:.85rem;color:var(--muted)">这里显示当前班级的留言和“全部班级”的留言。学生每小时最多发 10 条。</div>
+      <div style="margin:8px 0;font-size:.85rem;color:var(--muted)">这里显示当前班级的留言和“全部班级”的留言。学生每小时最多发 10 条，超过 30 天的留言会自动删除。</div>
       <div class="row">
         <label>发布范围<select id="tw-scope"><option value="class">当前班级</option><option value="all">全部班级</option></select></label>
         <label style="flex:1;min-width:200px">内容<input id="tw-body" maxlength="200" style="width:100%"></label>
         <button class="b" data-a="teacherPost">以老师身份发布</button>
       </div>
-      <div id="tw-list" style="margin-top:10px"></div>
+      <div id="tw-list" style="margin-top:10px;max-height:420px;overflow-y:auto"></div>
     </details>
   </section>
 
