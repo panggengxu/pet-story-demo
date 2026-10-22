@@ -208,7 +208,13 @@ const Auth = (() => {
   const friendRequest = code => rpc('friend_request', { p_code: code });
   const friendRespond = (id, accept) => rpc('friend_respond', { p_id: id, p_accept: accept });
   const friendRemove = id => rpc('friend_remove', { p_id: id });
-  const sendGift = otherId => rpc('send_gift', { p_friend: otherId });
+  const sendGiftCoins = (otherId, amount) => rpc('send_gift_coins', { p_friend: otherId, p_amount: amount });
+  const sendGiftItem = (otherId, name) => rpc('send_gift_item', { p_friend: otherId, p_name: name });
+  async function claimGiftItems() {                       // 领取好友送的配件
+    const { data, error } = await sb.rpc('claim_gift_items');
+    if (error) throw new Error(error.message);
+    return data || [];
+  }
 
   const saveKey = id => 'petsStory.save.' + id;                       // 本机备份用
 
@@ -285,7 +291,7 @@ const Auth = (() => {
     return data;
   }
 
-  return { sb, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGift, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
+  return { sb, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGiftCoins, sendGiftItem, claimGiftItems, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
     users, classes, ready, session, login, logout, guard, START, SUBJECTS, KIND, saveKey,
     notices, saveNotices, topics, saveTopics, records, saveRecords, sub, setProof, delProof, proofUrl,
     grant, claimAwards, pendingAward, loadSave, fetchMySave, pushMySave };
