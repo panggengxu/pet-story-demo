@@ -67,14 +67,14 @@ const Auth = (() => {
     RC = {};
     r.forEach(x => { const cd = codeOf(x.student_id); if (cd) (RC[`${x.day}|${x.kind}|${x.subject}`] ||= []).push(cd); });
         SV = {};
+        SV = { last_seen: {} };
     g.forEach(x => { 
       const cd = codeOf(x.user_id); 
       if (cd) {
-        SV[cd] = x.data; 
-        // 如果最近 2 分钟内有更新 last_seen，说明在线
-        const isOnline = x.last_seen && (Date.now() - Date.parse(x.last_seen) < 120000);
-        const f = FR.find(fr => fr.otherId === x.user_id);
-        if (f) f.isOnline = isOnline;
+        SV[cd] = x.data;
+        if (x.last_seen) {
+          SV.last_seen[x.user_id] = x.last_seen;
+        }
       } 
     });
     PA = {};
