@@ -657,7 +657,12 @@ const ACTIONS = {
     $('gacha-reward-name').textContent = `${reward.rarity} · ${reward.name}（战力 +${reward.power}）` + (dup ? ` 🔁 重复！可分解换 ${SELL[reward.rarity]}🪙` : '');
     openModal('gacha-modal');
   },
-  close: closeModals,
+    close() {
+    if (duelBusy === true) {
+      if (!confirm('战斗还没结束，确定要逃跑吗？（逃跑将不会获得奖励）')) return;
+    }
+    closeModals();
+  },
   previewSong({ id }) { playSong(SONGS.find(s => s.id == id), true); toast(`🎧 开始 ${PREVIEW_SECONDS} 秒免费试听`); },
   unlockSong({ id }) {
     const s = SONGS.find(s => s.id == id);
