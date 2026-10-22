@@ -874,15 +874,24 @@ load(); render(); renderMessages();                        // 先用本机备份
 
 async function triggerDuelFriend({ id }) {
   if (duelBusy) return;
+
+  // 去好友列表里找，如果传进来的是数字（比如 16、18），说明前端传错了
+  // 我们主动去 Auth.friends() 里找出对方的真实 UUID
+  let realUuid = id;
+  const f = Auth.friends().find(x => x.otherId === id || x.id === id);
   
-  // 强行去好友列表里找一遍，确保拿到的绝对是一个合法的 UUID
-  const f = Auth.friends().find(x => x.otherId === id) || Auth.friends().find(x => x.id === id);
-  const realUuid = f ? f.otherId : id;
+  if (f) {
+    realUuid = f.otherId; // 强行取 otherId (这才是真正的用户 UUID)
+  } else {
+    // 如果彻底找不到，说明数据有问题，直接提示
+    return toast('❌ 找不到该好友的账号信息，请刷新页面重试');
+  }
 
   duelBusy = true;
   try {
     await pushSave(true);
-    const duelId = await Auth.inviteDuel(realUuid); // 传入真正的 UUID
+    // 把真正的 UUID 传给数据库
+    const duelId = await Auth.inviteDuel(realUuid); 
     openDuelRoom(duelId, false);
   } catch (e) {
     toast('❌ ' + e.message);
