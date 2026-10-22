@@ -35,7 +35,7 @@ const Auth = (() => {
       sb.from('topics').select('*').order('created_at'),
       sb.from('topic_done').select('topic_id,student_id'),
       sb.from('records').select('day,kind,subject,student_id').in('day', [...LD]),
-      sb.from('game_saves').select('user_id,data'),
+      sb.from('game_saves').select('user_id,data,last_seen'),
       sb.from('awards').select('student_id,coins,stars').eq('claimed', false),
       sb.from('hall_of_fame').select('*').order('score', { ascending: false }),   // 封神榜：表还没建时当作空，不影响其他功能
       sb.from('wall_posts').select('*').order('created_at', { ascending: false }).limit(100),   // 留言墙（同上）
@@ -66,8 +66,17 @@ const Auth = (() => {
     td.forEach(x => { const tt = T.find(y => y.id === x.topic_id), cd = codeOf(x.student_id); if (tt && cd) tt.done.push(cd); });
     RC = {};
     r.forEach(x => { const cd = codeOf(x.student_id); if (cd) (RC[`${x.day}|${x.kind}|${x.subject}`] ||= []).push(cd); });
-    SV = {};
-    g.forEach(x => { const cd = codeOf(x.user_id); if (cd) SV[cd] = x.data; });
+        SV = {};
+    g.forEach(x => { 
+      const cd = codeOf(x.user_id); 
+      if (cd) {
+        SV[cd] = x.data; 
+        // 如果最近 2 分钟内有更新 last_seen，说明在线
+        const isOnline = x.last_seen && (Date.now() - Date.parse(x.last_seen) < 120000);
+        const f = FR.find(fr => fr.otherId === x.user_id);
+        if (f) f.isOnline = isOnline;
+      } 
+    });
     PA = {};
     a.forEach(x => { const cd = codeOf(x.student_id); if (cd) { const o = PA[cd] ||= { coins: 0, stars: 0 }; o.coins += x.coins; o.stars += x.stars; } });
   }
@@ -216,8 +225,14 @@ const Auth = (() => {
   const sendGiftItem = (otherId, name) => rpc('send_gift_item', { p_friend: otherId, p_name: name });
   // ---- 好友单挑 ----
   const duels = () => clone(DU);
-  const duelChallenge = otherId => rpc('duel_challenge', { p_friend: otherId });
+    const inviteDuel = otherId => rpc('duel_invite', { p_friend: otherId });
+  const duelAction = (duelId, skill) => rpc('duel_action', { p_duel_id: duelId, p_skill: skill });
   const duelsSeen = async () => { await sb.rpc('duels_mark_seen'); };
+  const updateHeartbeat = () => {
+    sb.auth.getUser().then(({data: {user}}) => {
+      if (user) sb.from('game_saves').update({ last_seen: new Date().toISOString() }).eq('user_id', user.id);
+    });
+  };
   async function claimGiftItems() {                       // 领取好友送的配件
     const { data, error } = await sb.rpc('claim_gift_items');
     if (error) throw new Error(error.message);
@@ -299,7 +314,7 @@ const Auth = (() => {
     return data;
   }
 
-  return { sb, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGiftCoins, sendGiftItem, claimGiftItems, duels, duelChallenge, duelsSeen, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
+  return { sb, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGiftCoins, sendGiftItem, claimGiftItems, duels, inviteDuel, duelAction, updateHeartbeat, duelsSeen, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
     users, classes, ready, session, login, logout, guard, START, SUBJECTS, KIND, saveKey,
     notices, saveNotices, topics, saveTopics, records, saveRecords, sub, setProof, delProof, proofUrl,
     grant, claimAwards, pendingAward, loadSave, fetchMySave, pushMySave };
