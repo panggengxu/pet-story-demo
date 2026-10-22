@@ -66,7 +66,6 @@ const Auth = (() => {
     td.forEach(x => { const tt = T.find(y => y.id === x.topic_id), cd = codeOf(x.student_id); if (tt && cd) tt.done.push(cd); });
     RC = {};
     r.forEach(x => { const cd = codeOf(x.student_id); if (cd) (RC[`${x.day}|${x.kind}|${x.subject}`] ||= []).push(cd); });
-        SV = {};
         SV = { last_seen: {} };
     g.forEach(x => { 
       const cd = codeOf(x.user_id); 
