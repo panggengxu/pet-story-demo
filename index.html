@@ -241,6 +241,7 @@ const HATCH_COST = 50, GACHA_COST = 30, PREVIEW_SECONDS = 30;
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80';
 const SLOTS = ['武器', '防具', '饰品', '宝物', '翅膀', '核心'];
 const SUBS = ['BC 华文', 'BM 马来文', 'BI 英文', 'MM 数学', 'SC 科学'];
+
 // 宠物形态：等级 = 数组下标；needStars 为进化所需的累计星星数（不扣除）
 const PET_STAGES = [
   { name: '神秘宠物蛋', img: 'pet/Egg.jpg',            label: '等待孵化 🥚' },
@@ -248,8 +249,8 @@ const PET_STAGES = [
   { name: 'AI 幻兽伙伴', img: 'pet/Ender dragon 2.jpg', label: 'Lv.2 觉醒高阶形态 ✨', needStars: 15 },
   { name: 'AI 幻兽伙伴', img: 'pet/Ender dragon 3.jpg', label: 'Lv.3 终极神兽形态 👑', needStars: 30 }
 ];
-// 宠物品种：破蛋时按权重随机抽一个（weight 越大越容易抽到，想让某只更稀有就把它的 weight 调小，例如 0.3）
-// stages 是 Lv.1 / Lv.2 / Lv.3 的图片；只有一张图的品种，三个等级都显示这一张，以后补了图，在 stages 里按顺序加路径就行
+
+// 宠物品种：破蛋时按权重随机抽一个
 const PET_TYPES = [
   { id: 'ender',  name: '末影龙',     weight: 1, stages: ['pet/Ender dragon 1.jpg', 'pet/Ender dragon 2.jpg', 'pet/Ender dragon 3.jpg'] },
   { id: 'cosmic', name: '星空猫咪',   weight: 1, stages: ['pet/pet-cosmic.jpg'] },
@@ -259,12 +260,16 @@ const PET_TYPES = [
   { id: 'shadow', name: '暗影雷狼',   weight: 1, stages: ['pet/暗影雷狼.jpg'] }
 ];
 const petType = () => PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
-const petImage = lv => { const st = petType().stages; return st[Math.min(lv, st.length) - 1]; };
+const petImage = lv => { 
+  const st = petType().stages; 
+  return st[Math.min(lv - 1, st.length - 1)] || st[0]; 
+};
 function pickPet() {
   const total = PET_TYPES.reduce((n, t) => n + t.weight, 0);
   let r = Math.random() * total;
   return PET_TYPES.find(t => (r -= t.weight) < 0) || PET_TYPES[0];
 }
+
 const MUSIC = [
   { cat: '⚔️ 进击的巨人 (Attack on Titan)', songs: [
     { id: 101, title: 'Ashes on The Fire (主旋律)', price: 280, file: 'audio/AOT/Ashes on The Fire.mp3' },
@@ -282,11 +287,8 @@ const POOL = [
   { name: '疾风之翼',   type: '翅膀', icon: '🕊️', rarity: '史诗', weight: 15, power: 32 },
   { name: '传说神兽核心', type: '核心', icon: '⚡', rarity: '传说', weight: 8,  power: 60 }
 ];
-// 战力 = 宠物形态基础值 + 装备加成 + 亲密度/10；心情过低(<15)时 -10%
-// 分解重复装备获得的金币（期望值低于抽奖成本，避免刷金币）
 const SELL = { 稀有: 10, 史诗: 25, 传说: 60 };
 const PET_BASE = [0, 50, 120, 250];
-// 互动：每日次数上限、对话
 const LIMITS = { feed: 3, play: 3, pat: 5 };
 const SAYS = {
   feed: ['好好吃！谢谢你～', '肚子饱饱，超满足！'],
@@ -295,25 +297,27 @@ const SAYS = {
 };
 
 // ===== 状态与存档 =====
-const today = () => new Date().toLocaleDateString('sv'); // 本地日期 YYYY-MM-DD
+const today = () => new Date().toLocaleDateString('sv');
 const state = {
   coins: 500, stars: 10, completed: [], date: today(), unlockedMusic: [], inventory: [],
   equipped: Object.fromEntries(SLOTS.map(s => [s, null])), petLevel: 0, petType: '', messages: [],
   pet: { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0 }
 };
-const DEFAULT_STATE = JSON.stringify(state);                 // 初始存档的样子，测试工具“重置存档”用
-function load(remote) {                                   // remote：云端存档；没有就用本机备份
+const DEFAULT_STATE = JSON.stringify(state);
+
+function load(remote) {
   try { Object.assign(state, remote || JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); } catch {}
   if (!PET_STAGES[state.petLevel]) state.petLevel = 0;
-  if (state.petLevel > 0 && !PET_TYPES.some(t => t.id === state.petType)) state.petType = 'ender';   // 以前孵化的都是末影龙
-  if (state.date !== today()) { state.completed = []; state.date = today(); } // 每日重置打卡
+  if (state.petLevel > 0 && !PET_TYPES.some(t => t.id === state.petType)) state.petType = 'ender';
+  if (state.date !== today()) { state.completed = []; state.date = today(); }
   const p = state.pet = { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0, ...state.pet };
-  const h = Math.floor((Date.now() - p.tick) / 36e5);   // 每过 1 小时，心情 -3
+  const h = Math.floor((Date.now() - p.tick) / 36e5);
   p.mood = Math.max(0, p.mood - h * 3); p.tick += h * 36e5;
   if (p.day !== today()) { p.day = today(); p.feed = p.play = p.pat = 0; }
 }
+
 let synced = false;
-const pushSave = now => Auth.pushMySave(state, now, { power: calcPower(), pet_level: state.petLevel });   // 战力一起上传，好友排行榜用                                        // 云端存档读取完成后才允许上传，避免旧数据覆盖云端
+const pushSave = now => Auth.pushMySave(state, now, { power: calcPower(), pet_level: state.petLevel });
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch {}
   if (synced) pushSave(false);
@@ -353,14 +357,13 @@ function calcPower() {
 function renderCare() {
   const p = state.pet, on = state.petLevel > 0;
   $('pet-care').hidden = !on; if (!on) return;
-  $('power').textContent = calcPower(); $('bond').textContent = p.bond;
-  $('mood-bar').style.width = p.mood + '%';
-  $('mood-face').textContent = p.mood >= 70 ? '😄 开心' : p.mood >= 40 ? '🙂 还不错' : p.mood >= 15 ? '😐 有点无聊' : '😢 没精神（战力 -10%）';
+  $('power').textContent = calcPower();$('bond').textContent = p.bond;
+  $('mood-bar').style.width = p.mood + '\%';$('mood-face').textContent = p.mood >= 70 ? '😄 开心' : p.mood >= 40 ? '🙂 还不错' : p.mood >= 15 ? '😐 有点无聊' : '😢 没精神（战力 -10%）';
   [['feed', '🍖 喂食 (-5🪙)'], ['play', '🎾 陪玩'], ['pat', '🤗 摸摸']].forEach(([k, t]) => {
     const b = $('btn-' + k); b.textContent = `${t} ${p[k]}/${LIMITS[k]}`; b.disabled = p[k] >= LIMITS[k];
   });
 }
-function renderRank() {                                    // 好友战力排行榜 + 好友申请
+function renderRank() {
   const fr = Auth.friends();
   const rows = [{ name: me.name + '（我）', power: calcPower(), me: true },
     ...fr.filter(f => f.status === 'accepted').map(f => ({ name: f.name, cls: f.className, power: f.power, id: f.id, other: f.otherId, gifted: f.giftedToday }))
@@ -377,12 +380,13 @@ function renderRank() {                                    // 好友战力排行
   fr.filter(f => f.status === 'outgoing').forEach(f => box.append(el('div', { className: 'rank-item' },
     el('span', { className: 'hint', textContent: `⏳ 已向 ${f.code} 发送申请，等对方同意` }), btn('取消', 'removeFriend', { id: f.id }, 'unequip'))));
 }
+
 function renderPet() {
   const stage = PET_STAGES[state.petLevel], img = $('pet-img');
   const hatched = state.petLevel > 0, pic = hatched ? petImage(state.petLevel) : stage.img;
   $('pet-name').textContent = hatched ? petType().name : stage.name;
   $('pet-rank-text').textContent = stage.label;
-  if (img.dataset.src !== pic) {            // 仅在图片变化时才赋值，避免重复请求
+  if (img.dataset.src !== pic) {
     img.dataset.src = pic;
     img.onerror = () => { img.onerror = null; img.src = FALLBACK_IMG; };
     img.src = pic;
@@ -398,11 +402,12 @@ function renderPet() {
     b.style.background = next ? 'linear-gradient(135deg,#4318ff,#68e1fd)' : '';
   }
 }
+
 const equippedNames = () => SLOTS.map(k => state.equipped[k]?.name).filter(Boolean);
 const owned = name => state.inventory.some(x => x.name === name) || equippedNames().includes(name);
 const isDup = (it, i) => state.inventory.some((x, j) => j !== i && x.name === it.name) || equippedNames().includes(it.name);
 
-const myClassId = () => Auth.users().find(u => u.id === me.id)?.classId;   // 每次读最新的，老师转班后立刻生效
+const myClassId = () => Auth.users().find(u => u.id === me.id)?.classId;
 function renderNotices() {
   const box = $('notice-box'), all = Auth.notices().filter(n => n.classId === myClassId()).sort((a, b) => !!b.important - !!a.important).slice(0, 6); box.replaceChildren();
   if (!all.length) return box.append(el('div', { className: 'hint', textContent: '老师还没有发布公告。' }));
@@ -421,7 +426,6 @@ function renderNotices() {
   });
 }
 
-// 照片压缩：最长边 720px、JPEG 60%，一张约 50–100KB，避免撑爆浏览器存储
 function shrink(file, max = 720) {
   return new Promise((ok, no) => {
     const img = new Image(), url = URL.createObjectURL(file);
@@ -437,7 +441,6 @@ function shrink(file, max = 720) {
 }
 let proofFor = null, proofData = null;
 
-// ===== 封神榜：各科前十名；同一个人只算他最好的一次成绩；同分并列 =====
 let hofSubj = '总分';
 const fmt = n => +Number(n).toFixed(2);
 function renderHall() {
@@ -456,11 +459,11 @@ function renderHall() {
   ['总分', ...Auth.SUBJECTS].forEach(s => chips.append(btn(s, 'hofSubj', { id: s }, s === hofSubj ? 'btn-action' : 'btn-action btn-gold')));
   box.append(chips);
 
-  const mine = uid ? group(all.filter(e => e.studentId === uid))[0] : null;   // 自己的最好成绩（老师录入并关联了账号才有）
+  const mine = uid ? group(all.filter(e => e.studentId === uid))[0] : null;
   let msg = '老师还没有录入你这一科的成绩。';
   if (mine) {
     const r = rankOf(mine.score), tenth = top.length >= 10 ? top[top.length - 1].score : null;
-    const above = board.filter(e => e.score > mine.score).pop();               // 比我高的里面最接近的一位 = 下一个目标
+    const above = board.filter(e => e.score > mine.score).pop();
     msg = `🎯 你的最好成绩：${fmt(mine.score)} 分，目前排第 ${r} 名`;
     if (r > 10 && tenth != null) msg += `；距离前十名还差 ${fmt(tenth - mine.score)} 分`;
     msg += above ? `；再提高 ${fmt(above.score - mine.score)} 分就能超过 ${above.name}` : '；你是榜上第一名，继续保持！';
@@ -476,7 +479,7 @@ function renderHall() {
   });
 }
 
-function renderSubs() {                                    // 签到由老师在后台勾选，学生只能查看
+function renderSubs() {
   const box = $('subjects-container'), rec = Auth.records(); box.replaceChildren();
   SUBS.forEach(sub => {
     const done = (rec[`${today()}|${Auth.CHECKIN}|${sub}`] || []).includes(me.id);
@@ -519,8 +522,8 @@ function renderMusic() {
     });
   });
 }
-let wallShown = 15;                                        // 留言墙默认只显示最新 15 条，点“查看更多”再多看
-function renderMessages() {                                // 留言墙：同班和全部班级的留言（纯文本显示，防 XSS）
+let wallShown = 15;
+function renderMessages() {
   const box = $('msg-list'), uid = Auth.users().find(u => u.id === me.id)?.uid; box.replaceChildren();
   const all = Auth.wall(), posts = all.slice(0, wallShown);
   if (!posts.length) return box.append(el('div', { className: 'hint', textContent: '还没有留言，来写第一条吧！' }));
@@ -541,16 +544,27 @@ function care(k, mood, bond, cost) {
   state.coins -= cost; p[k]++; p.mood = Math.min(100, p.mood + mood); p.bond += bond; render();
   $('pet-say').textContent = '🐾 ' + SAYS[k][Math.floor(Math.random() * SAYS[k].length)];
 }
+
 const ACTIONS = {
   tab({ id }) {
     document.querySelectorAll('.section-view').forEach(v => v.classList.toggle('active', v.id === 'tab-' + id));
     document.querySelectorAll('.tab-btn').forEach(b => b.setAttribute('aria-selected', b.dataset.id === id));
   },
   cheat() { state.coins += 500; render(); toast('🪙 已增加 500 金币（调试）'); },
+  
   hatch() {
     if (state.coins < HATCH_COST) return toast(`❌ 金币不足，孵化需要 ${HATCH_COST} 金币`);
-    state.coins -= HATCH_COST; state.petLevel = 1; state.petType = pickPet().id; state.pet.mood = 70; state.pet.tick = Date.now(); render(); toast(`🎉 咔嚓！你孵出了「${petType().name}」！`);
+    state.coins -= HATCH_COST; 
+    state.petLevel = 1; 
+    state.petType = pickPet().id; 
+    state.pet.mood = 70; 
+    state.pet.tick = Date.now(); 
+    
+    render(); 
+    pushSave(true);
+    toast(`🎉 咔嚓！你孵出了「${petType().name}」！`);
   },
+
   evolve() {
     const next = PET_STAGES[state.petLevel + 1];
     if (!next) return toast('👑 宠物已是最高形态');
@@ -609,7 +623,7 @@ const ACTIONS = {
   },
   moreWall() { wallShown += 15; renderMessages(); },
   async post() {
-    const input = $('msg-input'), text = input.value.trim(), all = $('msg-scope').value === 'all';
+    const input = $('msg-input'), text = input.value.trim(), all =$('msg-scope').value === 'all';
     if (!text) return toast('请先写点内容再发布');
     if (!all && !myClassId()) return toast('你还没有班级，暂时只能发给全部班级');
     try { await Auth.postWall(text, all ? null : myClassId()); } catch (e) { return toast('❌ ' + e.message); }
@@ -627,20 +641,20 @@ const ACTIONS = {
     state.inventory.splice(i, 1); state.coins += SELL[it.rarity]; render();
     toast(`♻️ 分解【${it.name}】，获得 ${SELL[it.rarity]} 金币`);
   },
-  sellDup() {                                              // 每种装备保留一件（已穿戴的也算一件）
+  sellDup() {
     const seen = new Set(equippedNames()), keep = [];
     let n = 0, gold = 0;
     state.inventory.forEach(it => { if (seen.has(it.name)) { n++; gold += SELL[it.rarity]; } else { seen.add(it.name); keep.push(it); } });
     if (!n) return toast('没有重复装备');
     state.inventory = keep; state.coins += gold; render(); toast(`♻️ 分解了 ${n} 件，获得 ${gold} 金币`);
   },
-  submitTask({ id }) {                                     // 打开“提交证明”窗口
+  submitTask({ id }) {
     const n = Auth.notices().find(x => x.id === id);
-    if (!n || n.classId !== myClassId()) return;     // 只能提交本班的功课
+    if (!n || n.classId !== myClassId()) return;
     proofFor = id; proofData = null;
     $('proof-title').textContent = `${Auth.KIND[n.type] || '🎯 任务'} ${n.title}`;
     $('proof-need').textContent = n.needProof ? '老师要求：请至少提交文字说明或照片' : '文字说明和照片都是选填';
-    $('proof-note').value = ''; $('proof-file').value = ''; $('proof-img').hidden = true;
+    $('proof-note').value = ''; $('proof-file').value = '';$('proof-img').hidden = true;
     openModal('proof-modal');
   },
   sendProof() {
@@ -695,7 +709,7 @@ const ACTIONS = {
   logout() { Auth.logout(); }
 };
 
-// ===== 音乐：试听限制在 PREVIEW_SECONDS 内 =====
+// ===== 音乐 =====
 const player = $('bgm-player');
 let previewing = false;
 function playSong(song, preview) {
@@ -727,8 +741,8 @@ $('proof-file').addEventListener('change', async e => {
   try { proofData = await shrink(f); $('proof-img').src = proofData; $('proof-img').hidden = false; }
   catch { toast('⚠️ 这张图片无法读取，请换一张'); e.target.value = ''; }
 });
-load(); render(); renderMessages();                        // 先用本机备份快速显示
-// ===== 送礼物：送金币（扣自己的金币）/ 送配件（从自己的背包拿走）=====
+load(); render(); renderMessages();
+
 let giftTo = null, giftBusy = false;
 function openGift(f) {
   giftTo = f; $('gift-title').textContent = `🎁 送礼物给 ${f.name}`;
@@ -744,7 +758,6 @@ function openGift(f) {
   openModal('gift-modal');
 }
 
-// ===== 测试工具：只有学号以 test 开头的账号才会出现，方便反复测试而不用一直新建账号 =====
 const isTest = () => /^test/i.test(me.id);
 function resetState() {
   for (const k of Object.keys(state)) delete state[k];
@@ -766,26 +779,27 @@ function resetState() {
       btn('⬆️ 宠物升一级', 'tLevel', {}))));
 })();
 
-async function claim() {                                   // 领取：老师发的、签到的、好友送的金币，以及好友送的配件
+async function claim() {
   const got = await Auth.claimAwards(), items = await Auth.claimGiftItems().catch(() => []);
   const c = got.reduce((n, x) => n + x.coins, 0), t = got.reduce((n, x) => n + x.stars, 0), notes = [];
   if (got.length) { state.coins = Math.max(0, state.coins + c); state.stars = Math.max(0, state.stars + t); notes.push(`${c}🪙 ${t}⭐`); }
   items.forEach(x => {
-    const base = POOL.find(p => p.name === x.item_name);   // 只认奖池里真实存在的配件
+    const base = POOL.find(p => p.name === x.item_name);
     if (base) { state.inventory.push({ ...base }); notes.push(`【${base.name}】（来自 ${x.sender_name}）`); }
   });
   if (!notes.length) return;
   save(); pushSave(true);
   toast(`🎁 你收到了 ${notes.join('、')}`);
 }
-async function poll() {                                    // 同步老师新发布的公告和奖励
-  try { await Auth.refresh(); await claim(); render(); } catch (e) { /* 网络不好时下次再试 */ }
+async function poll() {
+  try { await Auth.refresh(); await claim(); render(); } catch (e) {}
 }
+
 Auth.ready.then(async () => {
   const cn = Auth.classes().find(c => c.id === myClassId())?.name;
   $('me-name').textContent = me.name + (cn ? `（${cn}）` : '');
   try {
-    const remote = await Auth.fetchMySave();               // 云端存档优先；没有就把本机进度上传（首次迁移）
+    const remote = await Auth.fetchMySave();
     if (remote) load(remote);
     synced = true;
     await claim();
