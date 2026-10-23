@@ -441,7 +441,7 @@ function render() {
     const d = Auth.loadSave(u.id) || {}, pa = Auth.pendingAward(u.id);
     const rec = Auth.records(), done = Auth.SUBJECTS.filter(sj => (rec[`${today()}|${Auth.CHECKIN}|${sj}`] || []).includes(u.id)).length;
     body.append(el('tr', {},
-      el('td', { textContent: `${u.gender || 'M'} ${u.name}（${u.id}${gradeOf(u.id) ? '·' + gradeOf(u.id) : ''}）` }),
+      el('td', { textContent: `[${u.gender || 'M'}] ${u.name}（${u.id}${gradeOf(u.id) ? '·' + gradeOf(u.id) : ''}）` }),
       el('td', { textContent: PETS[d.petLevel || 0] || '-' }),
       el('td', { textContent: `${d.coins ?? Auth.START.coins}${pa && pa.coins ? `（待领 ${pa.coins > 0 ? '+' : ''}${pa.coins}）` : ''}` }),
       el('td', { textContent: `${d.stars ?? Auth.START.stars}${pa && pa.stars ? `（待领 ${pa.stars > 0 ? '+' : ''}${pa.stars}）` : ''}` }),
@@ -522,13 +522,15 @@ const A = {
     if (name === null) return;
     const code = prompt('学号 / 登录账号（改了以后要用新的登录）\n推荐格式：p + 入学年份后两位 + 3 位序号，例如 p26001', u.id);
     if (code === null) return;
-    const genderInput = prompt('请输入性别 (M 代表男, F 代表女)', u.gender || 'M');
-    if (genderInput === null) return;
-    const gender = genderInput.trim().toUpperCase();
-    if (gender !== 'M' && gender !== 'F') return toast('性别只能输入 M 或 F');
+    let gender = prompt('性别（输入 M 为男生，F 为女生）', u.gender || 'M');
+    if (gender === null) return;
+    gender = gender.trim().toUpperCase(); 
+    if (gender !== 'M' && gender !== 'F') {
+      return toast('性别只能输入 M 或 F');
+    }
     const n = name.trim(), c = code.trim().toLowerCase();
     if (!n) return toast('姓名不能为空');
-    if (n === u.name && c === u.id) return;
+    if (n === u.name && c === u.id && gender === u.gender) return;
     if (c !== u.id && u.role === 'student' && !/^p\d{5}$/.test(c) && !confirm('学号不是推荐格式：p + 入学年份后两位 + 3 位序号（例如 p26001）。\n仍然改成这个吗？')) return;
     try { 
       // 👉 把 gender 一起传给后端更新
