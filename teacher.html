@@ -441,7 +441,7 @@ function render() {
     const d = Auth.loadSave(u.id) || {}, pa = Auth.pendingAward(u.id);
     const rec = Auth.records(), done = Auth.SUBJECTS.filter(sj => (rec[`${today()}|${Auth.CHECKIN}|${sj}`] || []).includes(u.id)).length;
     body.append(el('tr', {},
-      el('td', { textContent: `[${u.gender || 'M'}] ${u.name}（${u.id}${gradeOf(u.id) ? '·' + gradeOf(u.id) : ''}）` }),
+      el('td', { textContent: `${u.gender || 'M'} ${u.name}（${u.id}${gradeOf(u.id) ? '·' + gradeOf(u.id) : ''}）` }),
       el('td', { textContent: PETS[d.petLevel || 0] || '-' }),
       el('td', { textContent: `${d.coins ?? Auth.START.coins}${pa && pa.coins ? `（待领 ${pa.coins > 0 ? '+' : ''}${pa.coins}）` : ''}` }),
       el('td', { textContent: `${d.stars ?? Auth.START.stars}${pa && pa.stars ? `（待领 ${pa.stars > 0 ? '+' : ''}${pa.stars}）` : ''}` }),
