@@ -372,7 +372,8 @@ function save() {
 
 // ===== 工具 =====
 const $ = id => document.getElementById(id);
-let currentDuelId = null;
+let currentDuelId = null, lastDuelExpire = 0;
+const declinedDuels = new Set();                          // 已经拒绝过的挑战，不再每 30 秒重复询问
 let duelInterval = null;
 let duelBusy = false;
 let toastTimer;
@@ -705,6 +706,8 @@ const ACTIONS = {
     
     if (isDuelModal && currentDuelId && !duelBusy) {
       if (!confirm('逃跑会判负，确定要关闭吗？')) return;
+      const fleeing = currentDuelId; currentDuelId = null;
+      Auth.duelForfeit(fleeing).catch(() => {});              // 真正写进数据库：认输判负（不然这场会一直卡着）
     }
     
     if (duelInterval) clearInterval(duelInterval);
@@ -851,9 +854,9 @@ player.addEventListener('timeupdate', () => {
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-action]');
   if (t && !t.disabled) ACTIONS[t.dataset.action]?.(t.dataset);
-  else if (e.target.classList.contains('modal-overlay')) closeModals();
+  else if (e.target.classList.contains('modal-overlay')) ACTIONS.close();
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') ACTIONS.close(); });
 
 $('gacha-cost').textContent = GACHA_COST;
 const myClassName = Auth.classes().find(c => c.id === myClassId())?.name;
@@ -936,6 +939,7 @@ async function pollDuelState(duelId) {
   if (!document.getElementById('duel-log') || !duelModal || !duelModal.classList.contains('open')) {
     clearInterval(duelInterval); currentDuelId = null; return;
   }
+  if (Date.now() - lastDuelExpire > 10000) { lastDuelExpire = Date.now(); Auth.sb.rpc('duel_expire').then(() => {}, () => {}); }
   try {
     const { data: d, error } = await Auth.sb.from('duels').select('*').eq('id', duelId).single();
     if (error) throw error;
@@ -1010,12 +1014,14 @@ async function useSkill(skill) {
 async function notifyDuels() {
   // 先查有没有别人打了一半、我还没进去的房间
   try {
+    await Auth.sb.rpc('duel_expire');
     const { data } = await Auth.sb.from('duels').select('id, challenger, profiles!duels_challenger_fkey(name)').is('winner', null).eq('defender', Auth.users().find(u => u.id === me.id)?.uid).limit(1);
     if (data && data.length > 0) {
       const d = data[0];
+      if (declinedDuels.has(d.id) || $('duel-modal').classList.contains('open')) return;
       if (confirm(`⚔️ ${d.profiles.name} 向你发起了挑战！要迎战吗？`)) {
         openDuelRoom(d.id, true);
-      }
+      } else { declinedDuels.add(d.id); }
     }
   } catch (e) { /* 静默失败 */ }
 }

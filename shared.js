@@ -219,6 +219,10 @@ const Auth = (() => {
   const duels = () => clone(DU);
   const inviteDuel = otherId => rpc('duel_invite', { p_friend: otherId });
   const duelAction = (duelId, skill) => rpc('duel_action', { p_duel_id: duelId, p_skill: skill });
+  const duelForfeit = async duelId => {                    // 认输：对手获胜
+    const { error } = await sb.rpc('duel_forfeit', { p_duel_id: duelId });
+    if (error) throw new Error(error.message);
+  };
   // 删除旧的 duelsSeen，换成更新对战状态
   const duelUpdateHP = (duelId, aHp, bHp, winner) => rpc('duel_update_hp', { p_duel_id: duelId, p_a_hp: aHp, p_b_hp: bHp, p_winner: winner });
   
@@ -314,7 +318,7 @@ const Auth = (() => {
     return data;
   }
 
-  return { sb, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGiftCoins, sendGiftItem, claimGiftItems, duels, inviteDuel, duelAction, duelUpdateHP, updateHeartbeat, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
+  return { sb, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGiftCoins, sendGiftItem, claimGiftItems, duels, inviteDuel, duelAction, duelForfeit, duelUpdateHP, updateHeartbeat, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
     users, classes, ready, session, login, logout, guard, START, SUBJECTS, KIND, saveKey,
     notices, saveNotices, topics, saveTopics, records, saveRecords, sub, setProof, delProof, proofUrl,
     grant, claimAwards, pendingAward, loadSave, fetchMySave, pushMySave };
