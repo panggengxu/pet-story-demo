@@ -190,7 +190,7 @@ td.act{display:flex;gap:6px}
   <section class="card">
     <h2>📋 学生列表（<span id="count">0</span> 人）</h2>
     <div class="scroll"><table>
-      <thead><tr><th>姓名 / 学号</th><th>性别</th><th>宠物</th><th>金币</th><th>星星</th><th>今日签到</th><th>操作</th></tr></thead>
+      <thead><tr><th>姓名 / 学号</th><th>宠物</th><th>金币</th><th>星星</th><th>今日签到</th><th>操作</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
     <div id="empty" class="empty" hidden>还没有学生，请先在上方添加。</div>
@@ -441,7 +441,7 @@ function render() {
     const d = Auth.loadSave(u.id) || {}, pa = Auth.pendingAward(u.id);
     const rec = Auth.records(), done = Auth.SUBJECTS.filter(sj => (rec[`${today()}|${Auth.CHECKIN}|${sj}`] || []).includes(u.id)).length;
     body.append(el('tr', {},
-      el('td', { textContent: `${u.name}（${u.id}${gradeOf(u.id) ? '·' + gradeOf(u.id) : ''}）` }),
+      el('td', { textContent: `[${u.gender || 'M'}] ${u.name}（${u.id}${gradeOf(u.id) ? '·' + gradeOf(u.id) : ''}）` }),
       el('td', { textContent: PETS[d.petLevel || 0] || '-' }),
       el('td', { textContent: `${d.coins ?? Auth.START.coins}${pa && pa.coins ? `（待领 ${pa.coins > 0 ? '+' : ''}${pa.coins}）` : ''}` }),
       el('td', { textContent: `${d.stars ?? Auth.START.stars}${pa && pa.stars ? `（待领 ${pa.stars > 0 ? '+' : ''}${pa.stars}）` : ''}` }),
