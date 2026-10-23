@@ -27,7 +27,7 @@ const Auth = (() => {
 
   async function refresh() {
     const rs = await Promise.all([
-      sb.from('profiles').select('user_id,code,name,role,is_admin,class_id'),
+      sb.from('profiles').select('user_id,code,name,role,is_admin,class_id,gender'),
       sb.from('classes').select('id,name').order('created_at'),
       sb.from('teacher_classes').select('teacher_id,class_id'),
       sb.from('notices').select('*').order('created_at', { ascending: false }),
