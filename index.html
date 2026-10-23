@@ -941,8 +941,10 @@ async function pollDuelState(duelId) {
   }
   if (Date.now() - lastDuelExpire > 10000) { lastDuelExpire = Date.now(); Auth.sb.rpc('duel_expire').then(() => {}, () => {}); }
   try {
-    const { data: d, error } = await Auth.sb.from('duels').select('*').eq('id', duelId).single();
+    const { data: rows, error } = await Auth.sb.rpc('duel_state', { p_duel_id: duelId });
     if (error) throw error;
+    const d = (rows || [])[0];
+    if (!d) throw new Error('找不到这场战斗');
     
     const myUid = Auth.users().find(u => u.id === me.id)?.uid;
     const isChallenger = (d.challenger === myUid);
@@ -954,7 +956,7 @@ async function pollDuelState(duelId) {
     const oppHp = Math.max(0, isChallenger ? (d.b_hp ?? maxOppHp) : (d.a_hp ?? maxOppHp));
 
     const oppUid = isChallenger ? d.defender : d.challenger;
-    const oppName = Auth.users().find(u => u.uid === oppUid)?.name || '对手';
+    const oppName = Auth.friends().find(f => f.otherId === oppUid)?.name || Auth.users().find(u => u.uid === oppUid)?.name || '对手';
 
     const renderHp = (name, current, max) => el('div', { style: 'text-align:center;flex:1;padding:0 5px' },
       el('div', { textContent: name, style: 'font-weight:bold' }),
@@ -1011,19 +1013,20 @@ async function useSkill(skill) {
   }
 }
   
-async function notifyDuels() {
-  // 先查有没有别人打了一半、我还没进去的房间
+let checkingDuel = false;
+async function notifyDuels() {                             // 有人向我发起了挑战、我还没进房间？
+  if (checkingDuel || $('duel-modal').classList.contains('open')) return;
+  checkingDuel = true;
   try {
-    await Auth.sb.rpc('duel_expire');
-    const { data } = await Auth.sb.from('duels').select('id, challenger, profiles!duels_challenger_fkey(name)').is('winner', null).eq('defender', Auth.users().find(u => u.id === me.id)?.uid).limit(1);
-    if (data && data.length > 0) {
-      const d = data[0];
-      if (declinedDuels.has(d.id) || $('duel-modal').classList.contains('open')) return;
-      if (confirm(`⚔️ ${d.profiles.name} 向你发起了挑战！要迎战吗？`)) {
-        openDuelRoom(d.id, true);
-      } else { declinedDuels.add(d.id); }
-    }
-  } catch (e) { /* 静默失败 */ }
+    await Auth.sb.rpc('duel_expire');                      // 先让服务器把超时的旧对战结束掉
+    const { data, error } = await Auth.sb.rpc('my_pending_duel');   // 用数据库函数查，不受表读取权限限制
+    if (error) throw error;
+    const d = (data || [])[0];
+    if (!d || declinedDuels.has(d.id)) return;
+    if (confirm(`⚔️ ${d.challenger_name || '好友'} 向你发起了挑战！要迎战吗？`)) openDuelRoom(d.id, true);
+    else declinedDuels.add(d.id);
+  } catch (e) { console.warn('检查挑战失败：', e.message || e); }   // 不再完全静默，F12 的 Console 里能看到原因
+  finally { checkingDuel = false; }
 }
 
 // ===== 送礼物：送金币（扣自己的金币）/ 送配件（从自己的背包拿走）=====
@@ -1101,6 +1104,7 @@ Auth.ready.then(async () => {
   setInterval(() => { Auth.updateHeartbeat(); }, 60000);
   Auth.updateHeartbeat();
   setInterval(() => { if (!document.hidden) poll(); }, 30000);
+  setInterval(() => { if (!document.hidden) notifyDuels(); }, 6000);        // 收到挑战要尽快弹出来
   document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) pushSave(true); } else { Auth.updateHeartbeat(); poll(); } });
   window.addEventListener('pagehide', () => { if (synced) pushSave(true); });
 }).catch(() => {});
