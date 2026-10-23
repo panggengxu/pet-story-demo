@@ -54,7 +54,7 @@ const Auth = (() => {
       win: x.win, myPower: x.my_power, oppPower: x.opp_power, rounds: x.rounds, myPet: x.my_pet, oppPet: x.opp_pet, unseen: x.unseen }));
     const tcm = {};
     tc.forEach(x => (tcm[x.teacher_id] ||= []).push(x.class_id));
-    U = p.map(x => ({ uid: x.user_id, id: x.code, name: x.name, role: x.role, admin: x.is_admin, classId: x.class_id, classIds: tcm[x.user_id] || [] }));
+    U = p.map(x => ({ uid: x.user_id, id: x.code, name: x.name, role: x.role, gender: x.gender || 'M', admin: x.is_admin, classId: x.class_id, classIds: tcm[x.user_id] || [] }));
     C = c;
     N = n.map(x => ({ id: x.id, classId: x.class_id, batch: x.batch, important: x.important, type: x.type, subject: x.subject, title: x.title,
       body: x.body, coins: x.coins, stars: x.stars, needProof: x.need_proof, date: x.created_at.slice(0, 10), subs: {} }));
