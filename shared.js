@@ -35,7 +35,7 @@ const Auth = (() => {
       sb.from('topics').select('*').order('created_at'),
       sb.from('topic_done').select('topic_id,student_id'),
       sb.from('records').select('day,kind,subject,student_id').in('day', [...LD]),
-      sb.from('game_saves').select('user_id,data,last_seen'),
+      sb.from('game_saves').select('user_id,data'),
       sb.from('awards').select('student_id,coins,stars').eq('claimed', false),
       sb.from('hall_of_fame').select('*').order('score', { ascending: false }),   // 封神榜：表还没建时当作空，不影响其他功能
       sb.from('wall_posts').select('*').order('created_at', { ascending: false }).limit(100),   // 留言墙（同上）
@@ -49,7 +49,7 @@ const Auth = (() => {
     WP = (rs[11].error ? [] : rs[11].data).map(x => ({ id: x.id, authorId: x.author_id, name: x.author_name, role: x.author_role,
       classId: x.class_id, body: x.body, time: Date.parse(x.created_at) }));
     FR = (rs[12].error ? [] : rs[12].data).map(x => ({ id: x.id, status: x.status, otherId: x.other_id, code: x.code, name: x.name,
-      className: x.class_name, petLevel: x.pet_level, power: x.power, giftedToday: x.gifted_today }));
+      className: x.class_name, petLevel: x.pet_level, power: x.power, online: !!x.online }));   // online 由数据库按“2 分钟内有心跳”算好
     DU = (rs[13].error ? [] : rs[13].data).map(x => ({ id: x.id, time: Date.parse(x.created_at), iAmChallenger: x.i_am_challenger, oppName: x.opp_name,
       win: x.win, myPower: x.my_power, oppPower: x.opp_power, rounds: x.rounds, myPet: x.my_pet, oppPet: x.opp_pet, unseen: x.unseen }));
     const tcm = {};
@@ -67,17 +67,8 @@ const Auth = (() => {
     RC = {};
     r.forEach(x => { const cd = codeOf(x.student_id); if (cd) (RC[`${x.day}|${x.kind}|${x.subject}`] ||= []).push(cd); });
     
-    SV = SV || {}; 
-    SV.last_seen = SV.last_seen || {}; 
-    g.forEach(x => { 
-      const cd = codeOf(x.user_id); 
-      if (cd) {
-        SV[cd] = x.data;
-        if (x.last_seen) {
-          SV.last_seen[x.user_id] = x.last_seen;
-        }
-      } 
-    });
+    SV = {};
+    g.forEach(x => { const cd = codeOf(x.user_id); if (cd) SV[cd] = x.data; });
     PA = {};
     a.forEach(x => { const cd = codeOf(x.student_id); if (cd) { const o = PA[cd] ||= { coins: 0, stars: 0 }; o.coins += x.coins; o.stars += x.stars; } });
   }
@@ -231,10 +222,16 @@ const Auth = (() => {
   // 删除旧的 duelsSeen，换成更新对战状态
   const duelUpdateHP = (duelId, aHp, bHp, winner) => rpc('duel_update_hp', { p_duel_id: duelId, p_a_hp: aHp, p_b_hp: bHp, p_winner: winner });
   
-  const updateHeartbeat = () => {
-    sb.auth.getUser().then(({data: {user}}) => {
-      if (user) sb.from('game_saves').update({ last_seen: new Date().toISOString() }).eq('user_id', user.id);
-    });
+  const updateHeartbeat = async () => {                    // 心跳：让好友看到我在线（用服务器时间，不受手机时钟影响）
+    try {
+      const { error } = await sb.rpc('touch_last_seen');
+      if (error) throw error;
+    } catch (_) {                                            // 数据库函数还没建好时的备用做法
+      try {
+        const { data: { user } } = await sb.auth.getUser();
+        if (user) await sb.from('game_saves').update({ last_seen: new Date().toISOString() }).eq('user_id', user.id);
+      } catch (e) { /* 静默 */ }
+    }
   };
   async function claimGiftItems() {                       // 领取好友送的配件
     const { data, error } = await sb.rpc('claim_gift_items');
@@ -317,7 +314,7 @@ const Auth = (() => {
     return data;
   }
 
-  return { sb, SV, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGiftCoins, sendGiftItem, claimGiftItems, duels, inviteDuel, duelAction, duelUpdateHP, updateHeartbeat, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
+  return { sb, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGiftCoins, sendGiftItem, claimGiftItems, duels, inviteDuel, duelAction, duelUpdateHP, updateHeartbeat, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
     users, classes, ready, session, login, logout, guard, START, SUBJECTS, KIND, saveKey,
     notices, saveNotices, topics, saveTopics, records, saveRecords, sub, setProof, delProof, proofUrl,
     grant, claimAwards, pendingAward, loadSave, fetchMySave, pushMySave };

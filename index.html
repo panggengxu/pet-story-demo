@@ -428,19 +428,12 @@ function renderDuels() {
 function renderRank() {                                    // 好友战力排行榜 + 好友申请
   const fr = Auth.friends();
     const rows = [{ name: me.name + '（我）', power: calcPower(), me: true },
-    ...fr.filter(f => f.status === 'accepted').map(f => {
-      let isOnline = false;
-      if (Auth.SV && Auth.SV.last_seen && Auth.SV.last_seen[f.otherId]) {
-        isOnline = true; 
-        console.log('好友', f.name, '在线时间:', Auth.SV.last_seen[f.otherId]); // 看看是不是取到了
-      }
-      return { name: f.name, cls: f.className, power: f.power, id: f.id, other: f.otherId, isOnline };
-    })
+    ...fr.filter(f => f.status === 'accepted').map(f => ({ name: f.name, cls: f.className, power: f.power, id: f.id, other: f.otherId, isOnline: !!f.online }))
   ].sort((a, b) => b.power - a.power);
   $('rank-list').replaceChildren(...rows.map((r, i) => el('div', { className: 'rank-item', style: r.me ? 'background:#eeeaff;border-radius:8px' : '' },
         el('span', { style: 'display:flex;align-items:center;gap:6px' }, 
       el('span', { textContent: `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name}${r.cls ? '（' + r.cls + '）' : ''} · 战力 ${r.power}` }),
-      r.me ? '' : el('span', { style: `width:10px;height:10px;border-radius:50%;background:${r.isOnline ? '#05cd99' : '#ccc'}`, title: r.isOnline ? '在线' : '离线' })
+      r.me ? '' : el('span', { style: `flex:none;width:10px;height:10px;border-radius:50%;background:${r.isOnline ? '#05cd99' : '#ccc'}`, title: r.isOnline ? '在线（2 分钟内活跃）' : '离线' })
     ),
     r.me ? '' : el('span', { style: 'display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end' },
       btn('⚔️ 挑战', 'duelFriend', { id: r.other }), btn('🎁 送礼物', 'giftFriend', { id: r.other }), btn('删除', 'removeFriend', { id: r.id }, 'unequip')))));
@@ -717,6 +710,7 @@ const ACTIONS = {
     if (duelInterval) clearInterval(duelInterval);
     closeModals();
   },
+  useSkill({ skill }) { useSkill(Number(skill)); },
   previewSong({ id }) { playSong(SONGS.find(s => s.id == id), true); toast(`🎧 开始 ${PREVIEW_SECONDS} 秒免费试听`); },
   unlockSong({ id }) {
     const s = SONGS.find(s => s.id == id);
@@ -904,6 +898,15 @@ async function triggerDuelFriend({ id }) {
 }
 
 // 进入对战房间（无论是发起方还是被挑战方）
+// 技能按钮：用 data-action / data-skill，由全局点击监听调用 ACTIONS.useSkill
+// （注意：el() 里写 onclick: 'useSkill(1)' 是无效的——DOM 的 onclick 属性只接受函数，字符串会被丢掉）
+function skillBtn(n, name, desc) {
+  const b = el('button', { className: 'skill-btn', type: 'button' }, name, el('div', { className: 'skill-desc', textContent: desc }));
+  b.dataset.action = 'useSkill';
+  b.dataset.skill = String(n);
+  return b;
+}
+
 // 进入对战房间
 function openDuelRoom(duelId, isDefender = false) {
   currentDuelId = duelId;
@@ -915,9 +918,9 @@ function openDuelRoom(duelId, isDefender = false) {
       el('div', { textContent: '正在连接对战服务器...' })
     ),
     el('div', { id: 'skill-area', style: 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px;display:none' },
-      el('button', { className: 'skill-btn', onclick: 'useSkill(1)' }, '普通攻击', el('div', { className: 'skill-desc', textContent: '稳定输出' })),
-      el('button', { className: 'skill-btn', onclick: 'useSkill(2)' }, '强力猛击', el('div', { className: 'skill-desc', textContent: '高伤 · 20% Miss' })),
-      el('button', { className: 'skill-btn', onclick: 'useSkill(3)' }, '终极必杀', el('div', { className: 'skill-desc', textContent: '极高伤 · 50% Miss' }))
+      skillBtn(1, '普通攻击', '稳定输出'),
+      skillBtn(2, '强力猛击', '高伤 · 20% Miss'),
+      skillBtn(3, '终极必杀', '极高伤 · 50% Miss')
     )
   );
   openModal('duel-modal');
@@ -929,7 +932,10 @@ function openDuelRoom(duelId, isDefender = false) {
 
 // 轮询获取对战最新状态
 async function pollDuelState(duelId) {
-  if (!document.getElementById('duel-log')) { clearInterval(duelInterval); return; }
+  const duelModal = document.getElementById('duel-modal');
+  if (!document.getElementById('duel-log') || !duelModal || !duelModal.classList.contains('open')) {
+    clearInterval(duelInterval); currentDuelId = null; return;
+  }
   try {
     const { data: d, error } = await Auth.sb.from('duels').select('*').eq('id', duelId).single();
     if (error) throw error;
@@ -972,6 +978,7 @@ async function pollDuelState(duelId) {
     const skillArea = $('skill-area');
     
     if (d.winner) {
+      currentDuelId = null;                                 // 对战已经结束，关闭窗口时不用再确认
       skillArea.style.display = 'none';
       $('duel-title').textContent = d.winner === myUid ? '🏆 你赢了！' : '💥 你输了，下次加油！';
       clearInterval(duelInterval);
@@ -1088,7 +1095,7 @@ Auth.ready.then(async () => {
   setInterval(() => { Auth.updateHeartbeat(); }, 60000);
   Auth.updateHeartbeat();
   setInterval(() => { if (!document.hidden) poll(); }, 30000);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) pushSave(true); } else poll(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) pushSave(true); } else { Auth.updateHeartbeat(); poll(); } });
   window.addEventListener('pagehide', () => { if (synced) pushSave(true); });
 }).catch(() => {});
 
