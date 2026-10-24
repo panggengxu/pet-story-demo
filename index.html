@@ -132,6 +132,11 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
           <div id="pet-care" hidden>
             <div style="display:flex;justify-content:space-between;font-size:.85rem"><span>心情 <span id="mood-face"></span></span><span class="power">⚔️ 战力 <span id="power"></span></span></div>
             <div class="bar" role="progressbar" aria-label="心情"><i id="mood-bar"></i></div>
+            <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-top:10px">
+              <span>✨ 经验值</span>
+              <span id="exp-text"></span>
+            </div>
+            <div class="bar" role="progressbar" aria-label="经验值" style="margin-bottom:10px"><i id="exp-bar" style="background:linear-gradient(90deg,#ffb800,#ff4d4d)"></i></div>
             <div class="hint" style="margin-bottom:8px">💗 亲密度 <span id="bond"></span>（每 10 点 +1 战力）</div>
             <div class="pet-act">
               <button id="btn-feed" class="btn-action" data-action="feed"></button>
@@ -436,6 +441,8 @@ const state = {
 const DEFAULT_STATE = JSON.stringify(state);                 // 初始存档的样子，测试工具“重置存档”用
 function load(remote) {                                   // remote：云端存档；没有就用本机备份
   try { Object.assign(state, remote || JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); } catch {}
+  if (typeof state.petExp !== 'number') state.petExp = 0;
+  if (typeof state.petLevel !== 'number') state.petLevel = 0;
   if (state.petLevel < 1) state.petLevel = 0;
   if (state.petLevel > 0 && !PET_TYPES.some(t => t.id === state.petType)) state.petType = 'ender';
   state.box = (Array.isArray(state.box) ? state.box : []).filter(e => e && e.level > 0 && e.pet && e.equipped)
@@ -486,15 +493,29 @@ function render() {
 const gearPower = it => it ? (POOL.find(p => p.name === it.name)?.power ?? 0) : 0;
 function calcPower() {
   if (state.petLevel < 1) return 0;
-  const raw = PET_BASE[state.petLevel] + SLOTS.reduce((n, k) => n + gearPower(state.equipped[k]), 0);
+  // 👇 基础战力 = 50 + 等级*20 + 等级^1.5 的平滑公式
+  const basePower = Math.floor(50 + (state.petLevel * 20) + Math.pow(state.petLevel, 1.5));
+  const gearPowerTotal = SLOTS.reduce((n, k) => n + gearPower(state.equipped[k]), 0);
+  const raw = basePower + gearPowerTotal;
   return Math.round(raw * (state.pet.mood < 15 ? 0.9 : 1)) + Math.floor(state.pet.bond / 10);
 }
+  
 function renderCare() {
   const p = state.pet, on = state.petLevel > 0;
   $('pet-care').hidden = !on; if (!on) return;
+  
   $('power').textContent = calcPower(); $('bond').textContent = p.bond;
   $('mood-bar').style.width = p.mood + '%';
   $('mood-face').textContent = p.mood >= 70 ? '😄 开心' : p.mood >= 40 ? '🙂 还不错' : p.mood >= 15 ? '😐 有点无聊' : '😢 没精神（战力 -10%）';
+  
+  // 👇 就是这两段，把经验和进度条画出来
+  if ($('exp-bar')) {
+    const expNeeded = Math.floor(100 + (state.petLevel || 0) * 30 + Math.pow(state.petLevel || 0, 1.8));
+    const currentExp = state.petExp || 0;
+    $('exp-bar').style.width = Math.min(100, (currentExp / expNeeded) * 100) + '%';
+    $('exp-text').textContent = `${currentExp} / ${expNeeded}`;
+  }
+
   [['feed', '🍖 喂食 (-5🪙)'], ['play', '🎾 陪玩'], ['pat', '🤗 摸摸']].forEach(([k, t]) => {
     const b = $('btn-' + k); b.textContent = `${t} ${p[k]}/${LIMITS[k]}`; b.disabled = p[k] >= LIMITS[k];
   });
@@ -777,8 +798,15 @@ function care(k, mood, bond, cost) {
   const p = state.pet;
   if (p[k] >= LIMITS[k]) return toast('今天已经够啦，明天再来吧');
   if (state.coins < cost) return toast(`❌ 金币不足，需要 ${cost} 金币`);
-  state.coins -= cost; p[k]++; p.mood = Math.min(100, p.mood + mood); p.bond += bond; render();
-  $('pet-say').textContent = '🐾 ' + SAYS[k][Math.floor(Math.random() * SAYS[k].length)];
+  
+  state.coins -= cost; p[k]++; p.mood = Math.min(100, p.mood + mood); p.bond += bond; 
+  
+  // 👇 新增：获取经验并累加
+  const expGain = k === 'feed' ? 20 : (k === 'play' ? 30 : 10);
+  state.petExp = (state.petExp || 0) + expGain;
+  
+  render(); 
+  $('pet-say').textContent = `🐾 ${SAYS[k][Math.floor(Math.random() * SAYS[k].length)]} (+${expGain} 经验)`;
 }
 const ACTIONS = {
     tAddExp() { 
@@ -790,7 +818,7 @@ const ACTIONS = {
   tMaxLevel() { 
     if (!isTest()) return; 
     state.petLevel = 100; 
-    state.petExp = 0; 
+    state.petExp = 9999999; 
     render(); 
     toast('🚀 宠物已直接满级到 Lv.100'); 
   },
