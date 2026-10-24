@@ -1439,7 +1439,6 @@ setInterval(() => { Auth.updateHeartbeat(); }, 60000);
   setInterval(() => { if (!document.hidden) notifyDuels(); }, 6000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) pushSave(true); } else { Auth.updateHeartbeat(); poll(); } });
   window.addEventListener('pagehide', () => { if (synced) pushSave(true); });
-});
 }).catch(() => {});
 
 </script>
