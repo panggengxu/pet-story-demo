@@ -273,6 +273,12 @@ const me = Auth.guard('student');            // 未登录或身份不对，会�
 if (!me) throw new Error('未登录');
 const SAVE_KEY = Auth.saveKey(me.id);        // 每个学生独立存档
 const HATCH_COST = 50, GACHA_COST = 30, PREVIEW_SECONDS = 30;
+const DEFAULT_FIGHT_SONG = {
+  id: 2,
+  title: '默认战斗热血曲 ⚔️',
+  price: 0,
+  file: 'audio/Kevin MacLeod Bit Shift.mp3' // 👉 请确保你的项目里有这个路径的 MP3 文件
+};
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80';
 const SLOTS = ['武器', '防具', '饰品', '宝物', '翅膀', '核心'];
 const SUBS = ['BC 华文', 'BM 马来文', 'BI 英文', 'MM 数学', 'SC 科学'];
@@ -315,6 +321,10 @@ function pickPet() {
   return PET_TYPES.find(t => (r -= t.weight) < 0) || PET_TYPES[0];
 }
 const MUSIC = [
+  { cat: '🎵 默认音乐', songs: [
+    { id: 1, title: '星露谷物语：春日大厅曲', price: 0, file: 'audio/Stardew_Spring.mp3' },
+    { id: 2, title: 'Bit Shift', price: 0, file: 'audio/Kevin MacLeod Bit Shift.mp3' }
+  ]}
   { cat: '⚔️ 进击的巨人 (Attack on Titan)', songs: [
     { id: 101, title: 'Ashes on The Fire (主旋律)', price: 280, file: 'audio/AOT/Ashes on The Fire.mp3' },
     { id: 102, title: 'Dark Side Of The Moon (兵长角色曲)', price: 280, file: 'audio/AOT/Dark Side Of The Moon.mp3' } ] },
@@ -502,7 +512,7 @@ function renderNotices() {
     if (n.body) kids.push(el('div', { className: 'hint', textContent: n.body, style: 'margin:2px 0' }));
     if (n.type !== 'notice') {
       if (st === 'rejected') kids.push(el('div', { textContent: `❌ 老师退回：${sb.reply || '请重新提交'}`, style: 'color:#d33;font-size:.82rem;margin-top:4px' }));
-      kids.push(el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px' },
+      kids.push(el('div', { style: 'dis:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px' },
         el('span', { className: 'hint', textContent: `奖励：${n.coins}🪙 ${n.stars}⭐` }),
         st === 'done' ? el('span', { textContent: '✅ 已完成', style: 'color:var(--ok);font-weight:700;font-size:.85rem' })
           : btn(st === 'pending' ? '⏳ 等待批准' : st === 'rejected' ? '重新提交' : '提交完成', 'submitTask', { id: n.id }, 'btn-action', { disabled: st === 'pending' })));
@@ -714,7 +724,11 @@ const ACTIONS = {
       const fleeing = currentDuelId; currentDuelId = null;
       Auth.duelForfeit(fleeing).catch(() => {});              // 真正写进数据库：认输判负（不然这场会一直卡着）
     }
-    
+          
+    if (isDuelModal) {
+      playHomeBgm(); // 🎵 【新增】退出对战，切回大厅音乐！
+    }
+          
     if (duelInterval) clearInterval(duelInterval);
     closeModals();
   },
@@ -840,6 +854,31 @@ const ACTIONS = {
   logout() { Auth.logout(); }
 };
 
+// 记录当前大厅播放的音乐 ID（如果没有则默认 101）
+if (!state.currentBgmId) state.currentBgmId = 1;
+
+// 统一播放音频的底层函数
+function playBgm(song, loop = true) {
+  if (!song) return;
+  previewing = false; // 重置 30 秒试听状态
+  player.src = song.file;
+  player.hidden = false;
+  player.loop = loop;
+  player.play().catch(() => console.log('浏览器拦截自动播放，需用户交互'));
+}
+
+// 切换到主界面/大厅 BGM
+function playHomeBgm() {
+  const song = SONGS.find(s => s.id === state.currentBgmId) || SONGS[0];
+  playBgm(song, true);
+}
+
+// 切换到战斗专属 BGM
+function playFightBgm() {
+  const fightSongId = state.equippedFightBgmId;
+  const fightSong = SONGS.find(s => s.id === fightSongId) || DEFAULT_FIGHT_SONG;
+  playBgm(fightSong, true);
+}
 // ===== 音乐：试听限制在 PREVIEW_SECONDS 内 =====
 const player = $('bgm-player');
 let previewing = false;
@@ -918,6 +957,7 @@ function skillBtn(n, name, desc) {
 // 进入对战房间
 function openDuelRoom(duelId, isDefender = false) {
   currentDuelId = duelId;
+  playFightBgm(); // 🎵 【新增】进入对战，切成战斗音乐！
   $('duel-title').textContent = isDefender ? '⚔️ 迎战！' : '⚔️ 对战中...';
   
   $('duel-body').replaceChildren(
