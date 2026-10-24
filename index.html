@@ -52,7 +52,36 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .bar>i{display:block;height:100%;background:linear-gradient(90deg,#ff9a9e,#fad0c4);transition:width .3s}
 .pet-act{display:flex;gap:6px}.pet-act .btn-action{flex:1}
 .power{font-weight:700;color:var(--primary)}
-@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+/* ===== 对战舞台 ===== */
+.arena{position:relative;height:190px;border-radius:14px;overflow:hidden;background:linear-gradient(#bfe3ff 0%,#e9d5ff 62%);}
+.arena::after{content:'';position:absolute;left:0;right:0;bottom:0;height:30%;background:linear-gradient(#b7e4a8,#8ccf86);}
+.arena-sun{position:absolute;right:14px;top:10px;font-size:1.6rem;opacity:.9}
+.pet-slot{position:absolute;bottom:14px;width:42%;display:flex;flex-direction:column;align-items:center;z-index:2;transition:opacity .4s,filter .4s}
+.pet-slot.me{left:3%}.pet-slot.opp{right:3%}
+.arena-pet{width:100%;max-width:112px;height:104px;object-fit:cover;border-radius:16px;border:3px solid #fff;box-shadow:0 4px 10px rgba(0,0,0,.25);animation:arenaIdle 1.6s ease-in-out infinite}
+.pet-slot.opp .arena-pet{transform:scaleX(-1);animation-delay:.4s}
+.arena-name{margin-top:2px;font-size:.72rem;font-weight:700;background:rgba(255,255,255,.75);padding:1px 8px;border-radius:10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pet-slot.lunge-r{animation:arenaLungeR .6s ease-out}.pet-slot.lunge-l{animation:arenaLungeL .6s ease-out}
+.pet-slot.hit{animation:arenaHit .5s}.pet-slot.hit .arena-pet{filter:brightness(1.8) saturate(2.2) hue-rotate(-20deg)}
+.pet-slot.ko{opacity:.6;filter:grayscale(1)}
+.pet-slot.ko .arena-pet{animation:none;transform:rotate(78deg) translateY(10px)}
+.pet-slot.opp.ko .arena-pet{transform:scaleX(-1) rotate(78deg) translateY(10px)}
+.arena-fx-layer{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:3}
+.arena-fx{position:absolute;top:42%;font-size:2rem;animation:arenaFlyR .5s ease-in forwards}
+.arena-fx.fly-l{animation-name:arenaFlyL}
+.arena-num{position:absolute;top:18%;font-size:1.5rem;font-weight:900;color:#e11d48;text-shadow:0 2px 0 #fff,0 0 6px #fff;animation:arenaFloat 1s ease-out forwards}
+.arena-num.on-right{right:16%}.arena-num.on-left{left:16%}
+.arena-num.crit{font-size:2rem;color:#f59e0b}.arena-num.miss{color:#64748b;font-size:1.1rem}
+.arena-banner{position:absolute;left:0;right:0;top:34%;text-align:center;font-size:1.7rem;font-weight:900;z-index:4;text-shadow:0 2px 0 #fff,0 0 10px #fff;animation:arenaPop .5s ease-out}
+@keyframes arenaIdle{0%,100%{translate:0 0}50%{translate:0 -5px}}
+@keyframes arenaLungeR{0%{transform:translateX(0)}35%{transform:translateX(70px) scale(1.12)}100%{transform:translateX(0)}}
+@keyframes arenaLungeL{0%{transform:translateX(0)}35%{transform:translateX(-70px) scale(1.12)}100%{transform:translateX(0)}}
+@keyframes arenaHit{0%,100%{transform:translateX(0)}15%{transform:translateX(-9px)}30%{transform:translateX(9px)}45%{transform:translateX(-7px)}60%{transform:translateX(7px)}80%{transform:translateX(-3px)}}
+@keyframes arenaFlyR{from{left:24%;opacity:1;transform:scale(.8)}to{left:68%;opacity:.9;transform:scale(1.4)}}
+@keyframes arenaFlyL{from{left:68%;opacity:1;transform:scale(.8)}to{left:24%;opacity:.9;transform:scale(1.4)}}
+@keyframes arenaFloat{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-48px)}}
+@keyframes arenaPop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* 宠物对战动画特效 */
 @keyframes shake {
   0% { transform: translate(1px, 1px) rotate(0deg); }
@@ -1209,6 +1238,57 @@ function skillBtn(n, name, desc) {
   b.dataset.action = 'useSkill';
   b.dataset.skill = String(n);
   return b;
+}
+
+// ===== 对战舞台：两只宠物面对面，出招时冲过去、特效飞过去、对方抖动变红、头上飘伤害数字 =====
+let arenaLast = -1, arenaReady = false;                    // 已经演出到第几招；图片是否已经设置
+function buildArena() {
+  arenaLast = -1; arenaReady = false;
+  const box = document.querySelector('#duel-modal .modal-box');
+  if (box) box.style.width = 'min(480px,94vw)';             // 对战窗口比普通弹窗宽一点，舞台才放得下
+  const myImg = state.petLevel > 0 ? petImageOf({ type: state.petType, level: state.petLevel }) : 'pet/Egg.jpg';
+  const slot = (cls, id, src, name) => el('div', { className: 'pet-slot ' + cls, id },
+    el('img', { className: 'arena-pet', src, alt: name }), el('div', { className: 'arena-name', textContent: name }));
+  return el('div', { className: 'arena', id: 'duel-arena' },
+    el('div', { className: 'arena-sun', textContent: '☀️' }),
+    slot('me', 'arena-me', myImg, me.name),
+    slot('opp', 'arena-opp', 'pet/Egg.jpg', '对手'),
+    el('div', { className: 'arena-fx-layer', id: 'arena-fx' }));
+}
+function arenaPlay(l, mine) {                               // 演出一招
+  const atk = $(mine ? 'arena-me' : 'arena-opp'), def = $(mine ? 'arena-opp' : 'arena-me'), fx = $('arena-fx');
+  if (!atk || !def || !fx) return;
+  const miss = !(l.dmg > 0), skill = l.skill || 1, lunge = mine ? 'lunge-r' : 'lunge-l';
+  atk.classList.add(lunge);
+  atk.addEventListener('animationend', () => atk.classList.remove(lunge), { once: true });
+  const bolt = el('span', { className: 'arena-fx ' + (mine ? 'fly-r' : 'fly-l'), textContent: ['💥', '🔥', '⚡'][skill - 1] || '💥' });
+  fx.append(bolt); setTimeout(() => bolt.remove(), 600);
+  setTimeout(() => {                                         // 特效到达后：命中抖动变红 / 闪避
+    if (!miss) { def.classList.add('hit'); setTimeout(() => def.classList.remove('hit'), 520); }
+    const num = el('div', { className: 'arena-num ' + (mine ? 'on-right' : 'on-left') + (miss ? ' miss' : skill === 3 ? ' crit' : ''),
+      textContent: miss ? 'MISS' : '-' + Math.round(l.dmg) });
+    fx.append(num); setTimeout(() => num.remove(), 1000);
+  }, 380);
+}
+function arenaUpdate(d, isChallenger, myUid, logs, myHp, oppHp, oppName, oppUid) {
+  const me_ = $('arena-me'), opp = $('arena-opp');
+  if (!me_ || !opp) return;
+  if (!arenaReady) {                                         // 第一次拿到对战数据：设置对手的宠物图片和名字
+    arenaReady = true;
+    const type = isChallenger ? d.b_pet : d.a_pet, level = Auth.friends().find(f => f.otherId === oppUid)?.petLevel || 1;
+    if (type) opp.querySelector('.arena-pet').src = petImageOf({ type, level });
+    opp.querySelector('.arena-name').textContent = oppName;
+  }
+  if (arenaLast < 0) arenaLast = logs.length;                // 刚进来：只显示当前状态，不重播以前的招式
+  else if (logs.length > arenaLast) {
+    const fresh = logs.slice(arenaLast); arenaLast = logs.length;
+    fresh.forEach((l, i) => setTimeout(() => arenaPlay(l, l.who === myUid), i * 900));
+  }
+  me_.classList.toggle('ko', myHp <= 0); opp.classList.toggle('ko', oppHp <= 0);
+  if (d.winner && !$('arena-banner')) {                      // 分出胜负：显示大字
+    $('duel-arena').append(el('div', { id: 'arena-banner', className: 'arena-banner',
+      textContent: d.winner === myUid ? '🏆 胜利！' : '💥 败北…', style: 'color:' + (d.winner === myUid ? '#f59e0b' : '#64748b') }));
+  }
 }
 
 // 进入对战房间
