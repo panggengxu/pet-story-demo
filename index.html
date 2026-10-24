@@ -388,6 +388,7 @@ function save() {
 
 // ===== 工具 =====
 const $ = id => document.getElementById(id);
+const player = $('bgm-player');
 let currentDuelId = null, lastDuelExpire = 0;
 const declinedDuels = new Set();                          // 已经拒绝过的挑战，不再每 30 秒重复询问
 let duelInterval = null;
@@ -689,29 +690,30 @@ function care(k, mood, bond, cost) {
 }
 const ACTIONS = {
   // 装备大厅音乐
-// 装备大厅音乐
   equipHomeBgm(arg) {
-    const id = (typeof arg === 'object' && arg !== null) ? arg.id : arg;
+    const id = (typeof arg === 'object' && arg !== null) ? (arg.id || arg.arg) : arg;
+    if (!id) return;
     state.equippedHomeBgmId = Number(id);
     save(); pushSave();
     render();
-    renderMusic(); // 👈 刷新音乐盒，让按钮立刻变成“大厅播放中”并高亮
-    playHomeBgm(); // 立即切歌
+    renderMusic(); 
+    playHomeBgm(); 
     toast('🎵 已成功设为大厅背景音乐！');
   },
 
-  // 装备战斗音乐
   equipFightBgm(arg) {
-    const id = (typeof arg === 'object' && arg !== null) ? arg.id : arg;
+    const id = (typeof arg === 'object' && arg !== null) ? (arg.id || arg.arg) : arg;
+    if (!id) return;
     state.equippedFightBgmId = Number(id);
     save(); pushSave();
     render();
-    renderMusic(); // 👈 刷新音乐盒，让按钮立刻变成“战斗播放中”并高亮
+    renderMusic(); 
     toast('⚔️ 已成功设为战斗背景音乐！');
   },
 
   unlockSong(arg) {
-    const id = (typeof arg === 'object' && arg !== null) ? arg.id : arg;
+    const id = (typeof arg === 'object' && arg !== null) ? (arg.id || arg.arg) : arg;
+    if (!id) return;
     const s = SONGS.find(song => song.id == id);
     if (!s) return;
 
@@ -725,11 +727,10 @@ const ACTIONS = {
       state.unlockedMusic.push(s.id);
       save();
       pushSave();
-      render();      // 刷新顶栏金币
-      renderMusic(); // 👈 刷新音乐盒，解锁后按钮立刻变成“设为大厅/战斗”
+      render();      
+      renderMusic(); 
       toast('🎉 解锁成功！');
     }
-    
     playSong(s, false);
   },
   
@@ -836,30 +837,7 @@ const ACTIONS = {
   },
   useSkill({ skill }) { useSkill(Number(skill)); },
   previewSong({ id }) { playSong(SONGS.find(s => s.id == id), true); toast(`🎧 开始 ${PREVIEW_SECONDS} 秒免费试听`); },
-  unlockSong(arg) {
-    // 兼容传进来的是对象 { id } 或者是直接传数字 id
-    const id = (typeof arg === 'object' && arg !== null) ? arg.id : arg;
-    const s = SONGS.find(song => song.id == id);
-    if (!s) return;
 
-    // 确保 unlockedMusic 数组存在
-    if (!state.unlockedMusic) state.unlockedMusic = [1, 2];
-
-    if (!state.unlockedMusic.includes(s.id)) {
-      if ((state.coins || 0) < s.price) {
-        return toast(`❌ 金币不足，需要 ${s.price} 金币`);
-      }
-      state.coins -= s.price;
-      state.unlockedMusic.push(s.id);
-      save();
-      pushSave();
-      render();      // 刷新顶栏金币
-      renderMusic(); // 👈 关键：刷新音乐盒界面，按钮立刻变成“设为大厅/战斗”
-      toast('🎉 解锁成功！');
-    }
-    
-    playSong(s, false);
-  },
   tResetAll() { if (isTest() && confirm('确定重置这个测试账号的全部存档吗？金币、宠物、背包都会回到刚开始的样子。')) { resetState(); toast('已重置存档'); } },
   tEgg() { if (isTest()) { returnGear(state.equipped); emptyActive(); render(); toast('出战宠物已放生，变回宠物蛋（收纳箱里的不受影响）'); } },
   tFill() {
@@ -999,7 +977,6 @@ function playFightBgm() {
   playBgm(song, true);
 }
 // ===== 音乐：试听限制在 PREVIEW_SECONDS 内 =====
-const player = $('bgm-player');
 player.volume = 0.5; // 默认 50% 音量，避免太大声
 let previewing = false;
 function playSong(song, preview) {
