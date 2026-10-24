@@ -396,7 +396,7 @@ const closeModals = () => document.querySelectorAll('.modal-overlay').forEach(m 
 function render() {
   $('coins').textContent = state.coins;
   $('stars').textContent = state.stars;
-  renderPet(); renderPetBox(); renderCare(); renderRank();  renderMessages(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
+  renderPet(); renderPetBox(); renderCare(); renderRank(); renderDuels();  renderMessages(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
   save();
 }
 const gearPower = it => it ? (POOL.find(p => p.name === it.name)?.power ?? 0) : 0;
@@ -416,14 +416,19 @@ function renderCare() {
   });
 }
 
-function renderDuels() {
+function renderDuels() {                                   // 对战记录（最近 8 场）
   const box = $('duel-list');
   if (!box) return;
-  const list = Auth.duels().slice(0, 6); box.replaceChildren();
+  const list = Auth.duels().slice(0, 8); box.replaceChildren();
   if (!list.length) return box.append(el('div', { className: 'hint', textContent: '还没有对战记录，点好友旁边的“⚔️ 挑战”试试！' }));
-  list.forEach(d => box.append(el('div', { className: 'rank-item' },
-    el('span', { textContent: `${d.win ? '🏆' : '💥'} ${d.iAmChallenger ? '你挑战了 ' + d.oppName : d.oppName + ' 挑战了你'}：你${d.win ? '赢了' : '输了'}` }),
-    el('span', { className: 'hint', textContent: `${d.myPower} vs ${d.oppPower}` }))));
+  list.forEach(d => {
+    const who = d.iAmChallenger ? '你挑战了 ' + d.oppName : d.oppName + ' 挑战了你';
+    const res = !d.finished ? '⏳ 还没打完' : d.win ? '🏆 你赢了' : '💥 你输了';
+    const when = new Date(d.time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    box.append(el('div', { className: 'rank-item' },
+      el('span', { textContent: `${who}：${res}` }),
+      el('span', { className: 'hint', textContent: `${when}　战力 ${d.myPower} vs ${d.oppPower}` })));
+  });
 }
 
 function renderRank() {                                    // 好友战力排行榜 + 好友申请
@@ -985,6 +990,7 @@ async function pollDuelState(duelId) {
     
     if (d.winner) {
       currentDuelId = null;                                 // 对战已经结束，关闭窗口时不用再确认
+      Auth.refresh().then(renderDuels).catch(() => {});     // 马上把这一场记到“对战记录”里
       skillArea.style.display = 'none';
       $('duel-title').textContent = d.winner === myUid ? '🏆 你赢了！' : '💥 你输了，下次加油！';
       clearInterval(duelInterval);
