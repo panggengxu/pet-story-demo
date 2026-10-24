@@ -83,7 +83,14 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 <body>
 <div class="container">
   <header>
-    <div class="brand">🐾 Pets Story Pro · <span id="me-name"></span> <button class="tab-btn" data-action="logout">退出</button></div>
+    <div class="brand">
+      🐾 Pets Story Pro · <span id="me-name"></span> 
+      <span style="display:inline-flex;align-items:center;gap:6px;margin-left:12px;font-size:.8rem;font-weight:normal">
+        🔊 <input id="bgm-volume" type="range" min="0" max="1" step="0.05" value="0.5" style="width:80px;cursor:pointer" title="调整音乐音量">
+        <button class="tab-btn" data-action="toggleBgm" id="bgm-toggle-btn" style="padding:4px 8px">mute 🔇</button>
+      </span>
+      <button class="tab-btn" data-action="logout" style="margin-left:8px">退出</button>
+    </div>
     <div class="tabs" role="tablist">
       <button class="tab-btn" role="tab" data-action="tab" data-id="home" aria-selected="true">🏠 首页</button>
       <button class="tab-btn" role="tab" data-action="tab" data-id="shop" aria-selected="false">🛒 宠物商店与抽奖</button>
@@ -355,7 +362,7 @@ const SAYS = {
 // ===== 状态与存档 =====
 const today = () => new Date().toLocaleDateString('sv'); // 本地日期 YYYY-MM-DD
 const state = {
-  coins: 500, stars: 10, completed: [], date: today(), unlockedMusic: [], inventory: [],
+  coins: 500, stars: 10, completed: [], date: today(), unlockedMusic: [1,2], inventory: [],
   equipped: Object.fromEntries(SLOTS.map(s => [s, null])), petLevel: 0, petType: '', box: [], messages: [],
   pet: { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0 }
 };
@@ -641,6 +648,17 @@ function care(k, mood, bond, cost) {
   $('pet-say').textContent = '🐾 ' + SAYS[k][Math.floor(Math.random() * SAYS[k].length)];
 }
 const ACTIONS = {
+  toggleBgm() {
+    if (player.muted) {
+      player.muted = false;
+      $('bgm-toggle-btn').textContent = 'mute 🔇';
+      toast('🔊 音乐已开启');
+    } else {
+      player.muted = true;
+      $('bgm-toggle-btn').textContent = 'unmute 🔊';
+      toast('🔇 音乐已关闭');
+    }
+  },
   tab({ id }) {
     document.querySelectorAll('.section-view').forEach(v => v.classList.toggle('active', v.id === 'tab-' + id));
     document.querySelectorAll('.tab-btn').forEach(b => b.setAttribute('aria-selected', b.dataset.id === id));
@@ -880,6 +898,7 @@ function playFightBgm() {
 }
 // ===== 音乐：试听限制在 PREVIEW_SECONDS 内 =====
 const player = $('bgm-player');
+player.volume = 0.5; // 默认 50% 音量，避免太大声
 let previewing = false;
 function playSong(song, preview) {
   previewing = preview;
@@ -911,7 +930,8 @@ $('proof-file').addEventListener('change', async e => {
   catch { toast('⚠️ 这张图片无法读取，请换一张'); e.target.value = ''; }
 });
 load(); render(); renderMessages();                        // 先用本机备份快速显示
-
+renderMessages()
+  
 // ===== 实时对战系统 =====
 
 
@@ -1137,19 +1157,32 @@ async function poll() {                                    // 同步老师新发
   try { await Auth.refresh(); await claim(); render(); } catch (e) { /* 网络不好时下次再试 */ }
 }
 Auth.ready.then(async () => {
+  // 1. 绑定音量调节滑块
+  $('bgm-volume').addEventListener('input', e => {
+    player.volume = e.target.value;
+    if (player.volume > 0 && player.muted) {
+      player.muted = false;
+      $('bgm-toggle-btn').textContent = 'mute 🔇';
+    }
+  });
+
   const cn = Auth.classes().find(c => c.id === myClassId())?.name;
   $('me-name').textContent = me.name + (cn ? `（${cn}）` : '');
   try {
-    const remote = await Auth.fetchMySave();               // 云端存档优先；没有就把本机进度上传（首次迁移）
+    const remote = await Auth.fetchMySave();               
     if (remote) load(remote);
     synced = true;
     await claim();
   } catch (e) { toast('⚠️ 暂时无法同步存档，请检查网络'); }
-  render(); renderMessages();
+  
+  render(); 
+  renderMessages();                        
+  playHomeBgm(); // 🎵 新人进游戏自动播放大厅背景音乐！
+
   setInterval(() => { Auth.updateHeartbeat(); }, 60000);
   Auth.updateHeartbeat();
   setInterval(() => { if (!document.hidden) poll(); }, 30000);
-  setInterval(() => { if (!document.hidden) notifyDuels(); }, 6000);        // 收到挑战要尽快弹出来
+  setInterval(() => { if (!document.hidden) notifyDuels(); }, 6000);        
   document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) pushSave(true); } else { Auth.updateHeartbeat(); poll(); } });
   window.addEventListener('pagehide', () => { if (synced) pushSave(true); });
 }).catch(() => {});
