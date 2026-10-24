@@ -321,10 +321,9 @@ function pickPet() {
   return PET_TYPES.find(t => (r -= t.weight) < 0) || PET_TYPES[0];
 }
 const MUSIC = [
-  { cat: '🎵 默认音乐', songs: [
+  { cat: '默认音乐', songs: [
     { id: 1, title: '星露谷物语：春日大厅曲', price: 0, file: 'audio/Stardew_Spring.mp3' },
-    { id: 2, title: 'Bit Shift', price: 0, file: 'audio/Kevin MacLeod Bit Shift.mp3' }
-  ]}，
+    { id: 2, title: 'Bit Shift', price: 0, file: 'audio/Kevin MacLeod Bit Shift.mp3' } ] },
   { cat: '⚔️ 进击的巨人 (Attack on Titan)', songs: [
     { id: 101, title: 'Ashes on The Fire (主旋律)', price: 280, file: 'audio/AOT/Ashes on The Fire.mp3' },
     { id: 102, title: 'Dark Side Of The Moon (兵长角色曲)', price: 280, file: 'audio/AOT/Dark Side Of The Moon.mp3' } ] },
