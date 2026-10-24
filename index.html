@@ -630,6 +630,8 @@ function renderPet() {
         b.style.background = '#a3aed0';
       }
     }
+  }
+}
   
 const equippedNames = () => SLOTS.map(k => state.equipped[k]?.name).filter(Boolean);
 const owned = name => state.inventory.some(x => x.name === name) || equippedNames().includes(name);
