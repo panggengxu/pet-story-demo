@@ -676,7 +676,7 @@ function renderNotices() {
     if (n.body) kids.push(el('div', { className: 'hint', textContent: n.body, style: 'margin:2px 0' }));
     if (n.type !== 'notice') {
       if (st === 'rejected') kids.push(el('div', { textContent: `❌ 老师退回：${sb.reply || '请重新提交'}`, style: 'color:#d33;font-size:.82rem;margin-top:4px' }));
-      kids.push(el('div', { style: 'dis:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px' },
+      kids.push(el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px' },
         el('span', { className: 'hint', textContent: `奖励：${n.coins}🪙 ${n.stars}⭐` }),
         st === 'done' ? el('span', { textContent: '✅ 已完成', style: 'color:var(--ok);font-weight:700;font-size:.85rem' })
           : btn(st === 'pending' ? '⏳ 等待批准' : st === 'rejected' ? '重新提交' : '提交完成', 'submitTask', { id: n.id }, 'btn-action', { disabled: st === 'pending' })));
@@ -1198,7 +1198,6 @@ $('proof-file').addEventListener('change', async e => {
 });
 load(); render(); renderMessages();                        // 先用本机备份快速显示
 renderMessages()
-
   
 // ===== 实时对战系统 =====
 
@@ -1341,7 +1340,6 @@ async function pollDuelState(duelId) {
 
     const oppUid = isChallenger ? d.defender : d.challenger;
     const oppName = Auth.friends().find(f => f.otherId === oppUid)?.name || Auth.users().find(u => u.uid === oppUid)?.name || '对手';
-        arenaUpdate(d, isChallenger, myUid, d.rounds || [], myHp, oppHp, oppName, oppUid);   // 战斗舞台的演出
 
     const renderHp = (name, current, max) => el('div', { style: 'text-align:center;flex:1;padding:0 5px' },
       el('div', { textContent: name, style: 'font-weight:bold' }),
@@ -1354,6 +1352,8 @@ async function pollDuelState(duelId) {
       renderHp(oppName, oppHp, maxOppHp)
     );
     
+    arenaUpdate(d, isChallenger, myUid, d.rounds || [], myHp, oppHp, oppName, oppUid);   // 战斗舞台的演出
+
     // 渲染战斗日志
     const logs = d.rounds || [];
     $('duel-log').replaceChildren(...logs.map(l => {
