@@ -639,8 +639,11 @@ function renderMusic() {
           </div>
         `;
       } else {
-        rightActionHtml = `
-          <button class="tab-btn" data-action="unlockSong" data-arg="${s.id}">💎 解锁 (${s.price} 金币)</button>
+        // 修正：这里必须赋值给 actionHtml，而不是 rightActionHtml
+        actionHtml = `
+          <div style="margin-top:8px;">
+            <button class="tab-btn" data-action="unlockSong" data-arg="${s.id}">💎 解锁 (${s.price} 金币)</button>
+          </div>
         `;
       }
 
