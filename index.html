@@ -298,68 +298,68 @@ const SUBS = ['BC 华文', 'BM 马来文', 'BI 英文', 'MM 数学', 'SC 科学'
 // 宠物品种：破蛋时按权重随机抽一个（weight 越大越容易抽到，想让某只更稀有就把它的 weight 调小，例如 0.3）
 // stages 是 Lv.1 / Lv.2 / Lv.3 的图片；只有一张图的品种，三个等级都显示这一张，以后补了图，在 stages 里按顺序加路径就行
 const PET_TYPES = [
-  // 1. 🐲 末影龙（传说 / 3形态）
-  { id: 'ender',  name: '末影龙', weight: 10, rarity: '传说', 
+  // 1. 🐲 末影龙（传说 / 3形态 / 100级满级 / 1.4倍战力）
+  { id: 'ender',  name: '末影龙', weight: 10, rarity: '传说', maxLv: 100, powerMultiplier: 1.4,
     stages: [
       { level: 1,  img: 'pet/Ender dragon 1.jpg', name: '末影幼龙' },
-      { level: 15, img: 'pet/Ender dragon 2.jpg', name: '觉醒末影龙' },
-      { level: 30, img: 'pet/Ender dragon 3.jpg', name: '灭世末影龙' }
+      { level: 40, img: 'pet/Ender dragon 2.jpg', name: '觉醒末影龙' },
+      { level: 80, img: 'pet/Ender dragon 3.jpg', name: '灭世末影龙' }
     ] 
   },
 
-  // 2. 👾 草莓战士 Labubu（神话 / 5形态）
-  { id: 'labubu', name: '草莓战士', weight: 2, rarity: '神话', 
+  // 2. 👾 草莓战士 Labubu（神话 / 5形态 / 100级满级 / 1.8倍战力）
+  { id: 'labubu', name: '草莓战士', weight: 2, rarity: '神话', maxLv: 100, powerMultiplier: 1.8,
     stages: [
       { level: 1,  img: 'pet/pet-labubu1.jpg', name: '紫绒小兔' },
-      { level: 10, img: 'pet/pet-labubu2.jpg', name: '草莓骑士' },
-      { level: 20, img: 'pet/pet-labubu3.jpg', name: '紫金战神' },
-      { level: 35, img: 'pet/pet-labubu4.jpg', name: '银白星灵' },
-      { level: 50, img: 'pet/pet-labubu5.jpg', name: '星渊绿帝' } // 👈 最终神名
+      { level: 20, img: 'pet/pet-labubu2.jpg', name: '草莓骑士' },
+      { level: 40, img: 'pet/pet-labubu3.jpg', name: '紫金战神' },
+      { level: 60, img: 'pet/pet-labubu4.jpg', name: '银白星灵' },
+      { level: 80, img: 'pet/pet-labubu5.jpg', name: '星渊绿帝' }
     ] 
   },
 
-  // 3. 🐻 天空系飞熊（稀有 / 3形态）
-  { id: 'sky',    name: '天空系飞熊', weight: 5, rarity: '稀有', 
+  // 3. 🐻 天空系飞熊（稀有 / 3形态 / 80级满级 / 1.2倍战力）
+  { id: 'sky',    name: '天空系飞熊', weight: 5, rarity: '稀有', maxLv: 80, powerMultiplier: 1.2,
     stages: [
       { level: 1,  img: 'pet/pet-sky1.jpg', name: '云朵小飞熊' },
-      { level: 15, img: 'pet/pet-sky2.jpg', name: '星月飞熊' },
-      { level: 30, img: 'pet/pet-sky3.jpg', name: '幻彩梦境熊' }
+      { level: 30, img: 'pet/pet-sky2.jpg', name: '星月飞熊' },
+      { level: 60, img: 'pet/pet-sky3.jpg', name: '幻彩梦境熊' }
     ] 
   },
 
-  // 4. 🐱 星空猫咪（稀有 / 3形态）
-  { id: 'cosmic', name: '星空猫咪', weight: 5, rarity: '稀有', 
+  // 4. 🐱 星空猫咪（稀有 / 3形态 / 80级满级 / 1.2倍战力）
+  { id: 'cosmic', name: '星空猫咪', weight: 5, rarity: '稀有', maxLv: 80, powerMultiplier: 1.2,
     stages: [
       { level: 1,  img: 'pet/pet-cosmic1.jpg', name: '星尘猫咪' },
-      { level: 15, img: 'pet/pet-cosmic2.jpg', name: '星月法神' },
-      { level: 30, img: 'pet/pet-cosmic3.jpg', name: '银河星主' }
+      { level: 30, img: 'pet/pet-cosmic2.jpg', name: '星月法神' },
+      { level: 60, img: 'pet/pet-cosmic3.jpg', name: '银河星主' }
     ] 
   },
 
-  // 5. 🐉 炎系小火龙（普通 / 3形态）
-  { id: 'fire',   name: '炎系小火龙', weight: 10, rarity: '普通', 
+  // 5. 🐉 炎系小火龙（普通 / 3形态 / 60级满级 / 1.0倍战力）
+  { id: 'fire',   name: '炎系小火龙', weight: 10, rarity: '普通', maxLv: 60, powerMultiplier: 1.0,
     stages: [
       { level: 1,  img: 'pet/pet-fire1.jpg', name: '幼年小火龙' },
-      { level: 15, img: 'pet/pet-fire2.jpg', name: '烈焰飞龙' },
-      { level: 30, img: 'pet/pet-fire3.jpg', name: '晶石火龙尊' }
+      { level: 20, img: 'pet/pet-fire2.jpg', name: '烈焰飞龙' },
+      { level: 45, img: 'pet/pet-fire3.jpg', name: '晶石火龙尊' }
     ] 
   },
 
-  // 6. 🐺 暗影雷狼（普通 / 3形态）
-  { id: 'shadow', name: '暗影雷狼', weight: 10, rarity: '普通', 
+  // 6. 🐺 暗影雷狼（普通 / 3形态 / 60级满级 / 1.0倍战力）
+  { id: 'shadow', name: '暗影雷狼', weight: 10, rarity: '普通', maxLv: 60, powerMultiplier: 1.0,
     stages: [
       { level: 1,  img: 'pet/pet-wolf1.jpg', name: '暗影小狼' },
-      { level: 15, img: 'pet/pet-wolf2.jpg', name: '雷霆战狼' },
-      { level: 30, img: 'pet/pet-wolf3.jpg', name: '九霄雷帝' }
+      { level: 20, img: 'pet/pet-wolf2.jpg', name: '雷霆战狼' },
+      { level: 45, img: 'pet/pet-wolf3.jpg', name: '九霄雷帝' }
     ] 
   },
 
-  // 7. 🐰 萝卜兔（普通 / 3形态）
-  { id: 'plant',  name: '萝卜兔', weight: 15, rarity: '普通', 
+  // 7. 🐰 萝卜兔（普通 / 3形态 / 60级满级 / 1.0倍战力）
+  { id: 'plant',  name: '萝卜兔', weight: 15, rarity: '普通', maxLv: 60, powerMultiplier: 1.0,
     stages: [
       { level: 1,  img: 'pet/pet-plant1.jpg', name: '小萝卜兔' },
-      { level: 15, img: 'pet/pet-plant2.jpg', name: '花冠灵兔' },
-      { level: 30, img: 'pet/pet-plant3.jpg', name: '森之精灵王' }
+      { level: 20, img: 'pet/pet-plant2.jpg', name: '花冠灵兔' },
+      { level: 45, img: 'pet/pet-plant3.jpg', name: '森之精灵王' }
     ] 
   }
 ];
@@ -493,10 +493,17 @@ function render() {
 const gearPower = it => it ? (POOL.find(p => p.name === it.name)?.power ?? 0) : 0;
 function calcPower() {
   if (state.petLevel < 1) return 0;
-  // 👇 基础战力 = 50 + 等级*20 + 等级^1.5 的平滑公式
+  
+  // 获取当前宠物的稀有度倍率（如果找不到则默认 1.0）
+  const pt = PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
+  const multiplier = pt.powerMultiplier || 1.0;
+  
+  // 基础战力公式
   const basePower = Math.floor(50 + (state.petLevel * 20) + Math.pow(state.petLevel, 1.5));
   const gearPowerTotal = SLOTS.reduce((n, k) => n + gearPower(state.equipped[k]), 0);
-  const raw = basePower + gearPowerTotal;
+  
+  // 总战力 = (基础 + 装备) * 倍率 * 心情惩罚 + 亲密度
+  const raw = (basePower + gearPowerTotal) * multiplier;
   return Math.round(raw * (state.pet.mood < 15 ? 0.9 : 1)) + Math.floor(state.pet.bond / 10);
 }
   
@@ -601,25 +608,28 @@ function renderPet() {
     b.textContent = `🥚 消耗 ${HATCH_COST} 金币孵化神秘宠物蛋！`;
     b.style.background = 'linear-gradient(135deg,#ffb800,#ff4d4d)';
   } else {
-    if (state.petLevel >= 100) {
+    // 👇 获取这只宠物的专属满级上限
+    const currentMaxLv = pt.maxLv || 100;
+
+    if (state.petLevel >= currentMaxLv) {
       b.disabled = true;
       b.dataset.action = '';
-      b.textContent = '👑 已达最高等级 (Lv.100)';
+      b.textContent = `👑 已达最高等级 (Lv.${currentMaxLv})`;
       b.style.background = '#ccc';
     } else {
       const expNeeded = Math.floor(100 + state.petLevel * 30 + Math.pow(state.petLevel, 1.8));
+      const currentExp = state.petExp || 0;
+      
       b.dataset.action = 'evolve';
       b.disabled = false;
-      if (state.petExp >= expNeeded) {
+      if (currentExp >= expNeeded) {
         b.textContent = `✨ 经验已满！点击突破到 Lv.${state.petLevel + 1}`;
         b.style.background = 'linear-gradient(135deg,#ffb800,#ff4d4d)';
       } else {
-        b.textContent = `还需 ${expNeeded - state.petExp} 经验升级`;
-        b.style.background = '#a3aed0'; 
+        b.textContent = `还需 ${expNeeded - currentExp} 经验升级`;
+        b.style.background = '#a3aed0';
       }
     }
-  }
-}
   
 const equippedNames = () => SLOTS.map(k => state.equipped[k]?.name).filter(Boolean);
 const owned = name => state.inventory.some(x => x.name === name) || equippedNames().includes(name);
@@ -917,7 +927,12 @@ const ACTIONS = {
   },
   evolve() {
     if (state.petLevel < 1) return;
-    if (state.petLevel >= 100) return toast('👑 宠物已是最高形态');
+    
+    // 获取当前宠物品种的满级上限
+    const pt = PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
+    const currentMaxLv = pt.maxLv || 100;
+    
+    if (state.petLevel >= currentMaxLv) return toast(`👑 该宠物最高只能升到 Lv.${currentMaxLv}`);
     
     const expNeeded = Math.floor(100 + state.petLevel * 30 + Math.pow(state.petLevel, 1.8));
     if ((state.petExp || 0) < expNeeded) {
