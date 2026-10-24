@@ -627,25 +627,22 @@ function renderMusic() {
       const isFightEquipped = state.equippedFightBgmId === s.id;
 
       // 右侧按钮容器
-      let rightActionHtml = '';
+      const rightBtnsContainer = el('div', { style: 'display:flex; gap:8px; justify-content:flex-end' });
+      
       if (isUnlocked) {
-        rightActionHtml = `
-          <button class="tab-btn" data-action="equipHomeBgm" data-arg="${s.id}" style="background:${isHomeEquipped ? '#2e7d32' : ''}; color:${isHomeEquipped ? '#fff' : ''}">
-            ${isHomeEquipped ? '🏠 大厅播放中' : '🏠 设为大厅'}
-          </button>
-          <button class="tab-btn" data-action="equipFightBgm" data-arg="${s.id}" style="background:${isFightEquipped ? '#c62828' : ''}; color:${isFightEquipped ? '#fff' : ''}">
-            ${isFightEquipped ? '⚔️ 战斗播放中' : '⚔️ 设为战斗'}
-          </button>
-        `;
+        // 已解锁：显示设为大厅/战斗
+        rightBtnsContainer.append(
+          btn(isHomeEquipped ? '🏠 大厅播放中' : '🏠 设为大厅', 'equipHomeBgm', { arg: s.id }, 'tab-btn', { style: isHomeEquipped ? 'background:#2e7d32;color:#fff;' : '' }),
+          btn(isFightEquipped ? '⚔️ 战斗播放中' : '⚔️ 设为战斗', 'equipFightBgm', { arg: s.id }, 'tab-btn', { style: isFightEquipped ? 'background:#c62828;color:#fff;' : '' })
+        );
       } else {
-        rightActionHtml = `
-          <button class="tab-btn" data-action="unlockSong" data-arg="${s.id}">
-            🪙 解锁 (${s.price} 金币)
-          </button>
-        `;
+        // 未解锁：显示解锁按钮
+        rightBtnsContainer.append(
+          btn(`🪙 解锁 (${s.price} 金币)`, 'unlockSong', { arg: s.id }, 'tab-btn')
+        );
       }
 
-      // 创建单曲卡片（这里修改了结构，强制左右对齐）
+      // 创建单曲卡片（强制左右对齐）
       const card = el('div', { 
         className: 'music-item',
         style: 'display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px dashed var(--border)'
@@ -654,16 +651,12 @@ function renderMusic() {
         el('div', { style: 'flex:1; min-width:120px; font-weight:bold; font-size:0.9rem' }, 
           `🎶 ${s.title}`
         ),
-
         // 中间：试听按钮
         el('div', { style: 'flex:none; margin:0 15px' },
           btn(`试听 ${PREVIEW_SECONDS} 秒`, 'previewSong', { id: s.id }, 'btn-action btn-gold')
         ),
-
         // 右边：设为大厅 / 战斗 / 解锁
-        el('div', { style: 'flex:none; display:flex; gap:8px; justify-content:flex-end; min-width:200px' },
-          el('div', { style: 'display:flex; gap:8px', html: rightActionHtml })
-        )
+        el('div', { style: 'flex:none; min-width:220px; display:flex' }, rightBtnsContainer)
       );
 
       box.append(card);
