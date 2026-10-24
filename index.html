@@ -964,7 +964,7 @@ function playBgm(song, loop = true) {
 function playHomeBgm() {
   const homeSongId = state.equippedHomeBgmId || 1;
   const song = SONGS.find(s => s.id === homeSongId) || SONGS[0];
-  playBgm(song, false);
+  playBgm(song, true);
 }
 
 // 播放战斗专属 BGM
