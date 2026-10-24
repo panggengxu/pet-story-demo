@@ -1198,6 +1198,7 @@ $('proof-file').addEventListener('change', async e => {
 });
 load(); render(); renderMessages();                        // 先用本机备份快速显示
 renderMessages()
+
   
 // ===== 实时对战系统 =====
 
@@ -1340,6 +1341,7 @@ async function pollDuelState(duelId) {
 
     const oppUid = isChallenger ? d.defender : d.challenger;
     const oppName = Auth.friends().find(f => f.otherId === oppUid)?.name || Auth.users().find(u => u.uid === oppUid)?.name || '对手';
+        arenaUpdate(d, isChallenger, myUid, d.rounds || [], myHp, oppHp, oppName, oppUid);   // 战斗舞台的演出
 
     const renderHp = (name, current, max) => el('div', { style: 'text-align:center;flex:1;padding:0 5px' },
       el('div', { textContent: name, style: 'font-weight:bold' }),
