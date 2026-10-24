@@ -559,7 +559,7 @@ function renderPetBox() {                                  // 「我的宠物 n/
 }
 function renderPet() {
   const stage = PET_STAGES[state.petLevel], img = $('pet-img');
-  const hatched = state.petLevel > 0, pic = hatched ? petImage(state.petLevel) : stage.img;
+  const hatched = state.petLevel > 0, pic = hatched ? petImage(state.petType, state.petLevel) : stage.img;
   $('pet-name').textContent = hatched ? petType().name : stage.name;
   $('pet-rank-text').textContent = stage.label;
   if (img.dataset.src !== pic) {            // 仅在图片变化时才赋值，避免重复请求
