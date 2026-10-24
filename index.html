@@ -642,21 +642,21 @@ function renderMusic() {
         );
       }
 
-      // 创建单曲卡片（强制左右对齐）
+      // 创建单曲卡片（增加 flex-wrap 允许手机端换行）
       const card = el('div', { 
         className: 'music-item',
-        style: 'display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px dashed var(--border)'
+        style: 'display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px dashed var(--border); gap:10px;'
       },
         // 左边：歌曲名称
-        el('div', { style: 'flex:1; min-width:120px; font-weight:bold; font-size:0.9rem' }, 
+        el('div', { style: 'flex:1; min-width:150px; font-weight:bold; font-size:0.9rem' }, 
           `🎶 ${s.title}`
         ),
         // 中间：试听按钮
-        el('div', { style: 'flex:none; margin:0 15px' },
+        el('div', { style: 'flex:none;' },
           btn(`试听 ${PREVIEW_SECONDS} 秒`, 'previewSong', { id: s.id }, 'btn-action btn-gold')
         ),
         // 右边：设为大厅 / 战斗 / 解锁
-        el('div', { style: 'flex:none; min-width:220px; display:flex' }, rightBtnsContainer)
+        el('div', { style: 'flex:none; display:flex; gap:8px; justify-content:flex-end' }, rightBtnsContainer)
       );
 
       box.append(card);
