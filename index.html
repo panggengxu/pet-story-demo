@@ -362,7 +362,7 @@ const SAYS = {
 // ===== 状态与存档 =====
 const today = () => new Date().toLocaleDateString('sv'); // 本地日期 YYYY-MM-DD
 const state = {
-  coins: 500, stars: 10, completed: [], date: today(), unlockedMusic: [1,2], inventory: [],
+  coins: 500, stars: 10, completed: [], date: today(), unlockedMusic: [1,2], equippedHomeBgmId: 1, equippedFightBgmId: 2, inventory: [],
   equipped: Object.fromEntries(SLOTS.map(s => [s, null])), petLevel: 0, petType: '', box: [], messages: [],
   pet: { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0 }
 };
@@ -612,16 +612,51 @@ function renderInventory() {
     btn(`分解 +${SELL[it.rarity]}🪙`, 'sell', { id: i }, 'btn-action btn-gold btn-block', { style: 'margin-top:6px' }))));
 }
 function renderMusic() {
-  const box = $('music-container'); box.replaceChildren();
+  const box = $('music-container'); 
+  box.replaceChildren();
+
   MUSIC.forEach(c => {
+    // 渲染音乐分类标题
     box.append(el('div', { className: 'music-cat', textContent: c.cat }));
+
+    // 遍历分类下的每一首歌
     c.songs.forEach(s => {
-      const unlocked = state.unlockedMusic.includes(s.id);
-      box.append(el('div', { className: 'music-item' },
-        el('span', { textContent: `🎶 ${s.title}`, style: 'font-size:.85rem' }),
-        el('div', { style: 'display:flex;gap:6px' },
-          btn(`试听 ${PREVIEW_SECONDS} 秒`, 'previewSong', { id: s.id }, 'btn-action btn-gold'),
-          btn(unlocked ? '播放完整版 🎵' : `解锁 ${s.price}🪙`, 'unlockSong', { id: s.id }))));
+      const isUnlocked = state.unlockedMusic.includes(s.id);
+      const isHomeEquipped = state.equippedHomeBgmId === s.id;
+      const isFightEquipped = state.equippedFightBgmId === s.id;
+
+      // 动态生成操作按钮区域
+      let actionHtml = '';
+      if (isUnlocked) {
+        actionHtml = `
+          <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+            <button class="tab-btn" data-action="equipHomeBgm" data-arg="${s.id}" style="background:${isHomeEquipped ? '#2e7d32' : ''}">
+              ${isHomeEquipped ? '🏠 大厅播放中' : '🏠 设为大厅'}
+            </button>
+            <button class="tab-btn" data-action="equipFightBgm" data-arg="${s.id}" style="background:${isFightEquipped ? '#c62828' : ''}">
+              ${isFightEquipped ? '⚔️ 战斗播放中' : '⚔️ 设为战斗'}
+            </button>
+          </div>
+        `;
+      } else {
+        actionHtml = `<button class="tab-btn" data-action="buyMusic" data-arg="${s.id}">💎 解锁 (${s.cost || s.price} 金币)</button>`;
+      }
+
+      // 创建单曲卡片
+      const card = el('div', { className: 'music-item' },
+        el('div', { style: 'font-weight:bold;margin-bottom:4px', textContent: `🎶 ${s.title}` }),
+        el('div', { style: 'font-size:0.8rem;color:#aaa;margin-bottom:8px', textContent: s.desc || '' }),
+        el('div', { style: 'display:flex;gap:6px;margin-bottom:6px' },
+          btn(`试听 ${PREVIEW_SECONDS} 秒`, 'previewSong', { id: s.id }, 'btn-action btn-gold')
+        )
+      );
+
+      // 把装备/购买按钮拼接到卡片中
+      const btnContainer = document.createElement('div');
+      btnContainer.innerHTML = actionHtml;
+      card.append(btnContainer);
+
+      box.append(card);
     });
   });
 }
@@ -648,6 +683,23 @@ function care(k, mood, bond, cost) {
   $('pet-say').textContent = '🐾 ' + SAYS[k][Math.floor(Math.random() * SAYS[k].length)];
 }
 const ACTIONS = {
+  // 装备大厅音乐
+  equipHomeBgm(id) {
+    state.equippedHomeBgmId = id;
+    save(); pushSave();
+    render();
+    playHomeBgm(); // 立即切歌并试听
+    toast('🎵 已成功设为大厅背景音乐！');
+  },
+
+  // 装备战斗音乐
+  equipFightBgm(id) {
+    state.equippedFightBgmId = id;
+    save(); pushSave();
+    render();
+    toast('⚔️ 已成功设为战斗背景音乐！');
+  },
+  
   toggleBgm() {
     if (player.muted) {
       player.muted = false;
@@ -884,17 +936,18 @@ function playBgm(song, loop = true) {
   player.play().catch(() => console.log('浏览器拦截自动播放，需用户交互'));
 }
 
-// 切换到主界面/大厅 BGM
+// 播放大厅背景音乐
 function playHomeBgm() {
-  const song = SONGS.find(s => s.id === state.currentBgmId) || SONGS[0];
-  playBgm(song, true);
+  const homeSongId = state.equippedHomeBgmId || 1;
+  const song = SONGS.find(s => s.id === homeSongId) || SONGS[0];
+  playBgm(song, false);
 }
 
-// 切换到战斗专属 BGM
+// 播放战斗专属 BGM
 function playFightBgm() {
-  const fightSongId = state.equippedFightBgmId;
-  const fightSong = SONGS.find(s => s.id === fightSongId) || DEFAULT_FIGHT_SONG;
-  playBgm(fightSong, true);
+  const fightSongId = state.equippedFightBgmId || 2;
+  const song = SONGS.find(s => s.id === fightSongId) || SONGS[1];
+  playBgm(song, true);
 }
 // ===== 音乐：试听限制在 PREVIEW_SECONDS 内 =====
 const player = $('bgm-player');
