@@ -639,7 +639,9 @@ function renderMusic() {
           </div>
         `;
       } else {
-        actionHtml = `<button class="tab-btn" data-action="buyMusic" data-arg="${s.id}">💎 解锁 (${s.cost || s.price} 金币)</button>`;
+        rightActionHtml = `
+          <button class="tab-btn" data-action="unlockSong" data-arg="${s.id}">💎 解锁 (${s.price} 金币)</button>
+        `;
       }
 
       // 创建单曲卡片
@@ -803,12 +805,28 @@ const ACTIONS = {
   },
   useSkill({ skill }) { useSkill(Number(skill)); },
   previewSong({ id }) { playSong(SONGS.find(s => s.id == id), true); toast(`🎧 开始 ${PREVIEW_SECONDS} 秒免费试听`); },
-  unlockSong({ id }) {
-    const s = SONGS.find(s => s.id == id);
+  unlockSong(arg) {
+    // 兼容传进来的是对象 { id } 或者是直接传数字 id
+    const id = (typeof arg === 'object' && arg !== null) ? arg.id : arg;
+    const s = SONGS.find(song => song.id == id);
+    if (!s) return;
+
+    // 确保 unlockedMusic 数组存在
+    if (!state.unlockedMusic) state.unlockedMusic = [1, 2];
+
     if (!state.unlockedMusic.includes(s.id)) {
-      if (state.coins < s.price) return toast(`❌ 金币不足，需要 ${s.price} 金币`);
-      state.coins -= s.price; state.unlockedMusic.push(s.id); render(); toast('🎉 解锁成功，开始播放完整版');
+      if ((state.coins || 0) < s.price) {
+        return toast(`❌ 金币不足，需要 ${s.price} 金币`);
+      }
+      state.coins -= s.price;
+      state.unlockedMusic.push(s.id);
+      save();
+      pushSave();
+      render();      // 刷新顶栏金币
+      renderMusic(); // 👈 关键：刷新音乐盒界面，按钮立刻变成“设为大厅/战斗”
+      toast('🎉 解锁成功！');
     }
+    
     playSong(s, false);
   },
   tResetAll() { if (isTest() && confirm('确定重置这个测试账号的全部存档吗？金币、宠物、背包都会回到刚开始的样子。')) { resetState(); toast('已重置存档'); } },
