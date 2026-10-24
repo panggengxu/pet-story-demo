@@ -642,7 +642,7 @@ function renderMusic() {
         // 修正：这里必须赋值给 actionHtml，而不是 rightActionHtml
         actionHtml = `
           <div style="margin-top:8px;">
-            <button class="tab-btn" data-action="unlockSong" data-arg="${s.id}">💎 解锁 (${s.price} 金币)</button>
+            <button class="tab-btn" data-action="unlockSong" data-arg="${s.id}">🪙 解锁 (${s.price} 金币)</button>
           </div>
         `;
       }
@@ -689,20 +689,48 @@ function care(k, mood, bond, cost) {
 }
 const ACTIONS = {
   // 装备大厅音乐
-  equipHomeBgm(id) {
-    state.equippedHomeBgmId = id;
+// 装备大厅音乐
+  equipHomeBgm(arg) {
+    const id = (typeof arg === 'object' && arg !== null) ? arg.id : arg;
+    state.equippedHomeBgmId = Number(id);
     save(); pushSave();
     render();
-    playHomeBgm(); // 立即切歌并试听
+    renderMusic(); // 👈 刷新音乐盒，让按钮立刻变成“大厅播放中”并高亮
+    playHomeBgm(); // 立即切歌
     toast('🎵 已成功设为大厅背景音乐！');
   },
 
   // 装备战斗音乐
-  equipFightBgm(id) {
-    state.equippedFightBgmId = id;
+  equipFightBgm(arg) {
+    const id = (typeof arg === 'object' && arg !== null) ? arg.id : arg;
+    state.equippedFightBgmId = Number(id);
     save(); pushSave();
     render();
+    renderMusic(); // 👈 刷新音乐盒，让按钮立刻变成“战斗播放中”并高亮
     toast('⚔️ 已成功设为战斗背景音乐！');
+  },
+
+  unlockSong(arg) {
+    const id = (typeof arg === 'object' && arg !== null) ? arg.id : arg;
+    const s = SONGS.find(song => song.id == id);
+    if (!s) return;
+
+    if (!state.unlockedMusic) state.unlockedMusic = [1, 2];
+
+    if (!state.unlockedMusic.includes(s.id)) {
+      if ((state.coins || 0) < s.price) {
+        return toast(`❌ 金币不足，需要 ${s.price} 金币`);
+      }
+      state.coins -= s.price;
+      state.unlockedMusic.push(s.id);
+      save();
+      pushSave();
+      render();      // 刷新顶栏金币
+      renderMusic(); // 👈 刷新音乐盒，解锁后按钮立刻变成“设为大厅/战斗”
+      toast('🎉 解锁成功！');
+    }
+    
+    playSong(s, false);
   },
   
   toggleBgm() {
