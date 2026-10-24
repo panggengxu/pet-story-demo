@@ -1433,12 +1433,13 @@ render();
   document.addEventListener('click', unlockAudio);
   document.addEventListener('keydown', unlockAudio);
 
-  setInterval(() => { Auth.updateHeartbeat(); }, 60000);
+setInterval(() => { Auth.updateHeartbeat(); }, 60000);
   Auth.updateHeartbeat();
   setInterval(() => { if (!document.hidden) poll(); }, 30000);
-  setInterval(() => { if (!document.hidden) notifyDuels(); }, 6000);        
+  setInterval(() => { if (!document.hidden) notifyDuels(); }, 6000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) pushSave(true); } else { Auth.updateHeartbeat(); poll(); } });
   window.addEventListener('pagehide', () => { if (synced) pushSave(true); });
+});
 }).catch(() => {});
 
 </script>
