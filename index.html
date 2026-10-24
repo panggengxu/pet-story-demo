@@ -289,13 +289,7 @@ const DEFAULT_FIGHT_SONG = {
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80';
 const SLOTS = ['武器', '防具', '饰品', '宝物', '翅膀', '核心'];
 const SUBS = ['BC 华文', 'BM 马来文', 'BI 英文', 'MM 数学', 'SC 科学'];
-// 宠物形态：等级 = 数组下标；needStars 为进化所需的累计星星数（不扣除）
-const PET_STAGES = [
-  { name: '神秘宠物蛋', img: 'pet/Egg.jpg',            label: '等待孵化 🥚' },
-  { name: 'AI 幻兽伙伴', img: 'pet/Ender dragon 1.jpg', label: 'Lv.1 初阶萌态' },
-  { name: 'AI 幻兽伙伴', img: 'pet/Ender dragon 2.jpg', label: 'Lv.2 觉醒高阶形态 ✨', needStars: 15 },
-  { name: 'AI 幻兽伙伴', img: 'pet/Ender dragon 3.jpg', label: 'Lv.3 终极神兽形态 👑', needStars: 30 }
-];
+  
 // 宠物品种：破蛋时按权重随机抽一个（weight 越大越容易抽到，想让某只更稀有就把它的 weight 调小，例如 0.3）
 // stages 是 Lv.1 / Lv.2 / Lv.3 的图片；只有一张图的品种，三个等级都显示这一张，以后补了图，在 stages 里按顺序加路径就行
 const PET_TYPES = [
@@ -442,9 +436,9 @@ const state = {
 const DEFAULT_STATE = JSON.stringify(state);                 // 初始存档的样子，测试工具“重置存档”用
 function load(remote) {                                   // remote：云端存档；没有就用本机备份
   try { Object.assign(state, remote || JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); } catch {}
-  if (!PET_STAGES[state.petLevel]) state.petLevel = 0;
-  if (state.petLevel > 0 && !PET_TYPES.some(t => t.id === state.petType)) state.petType = 'ender';   // 以前孵化的都是末影龙
-  state.box = (Array.isArray(state.box) ? state.box : []).filter(e => e && PET_STAGES[e.level] && e.level > 0 && e.pet && e.equipped)
+  if (state.petLevel < 1) state.petLevel = 0;
+  if (state.petLevel > 0 && !PET_TYPES.some(t => t.id === state.petType)) state.petType = 'ender';
+  state.box = (Array.isArray(state.box) ? state.box : []).filter(e => e && e.level > 0 && e.pet && e.equipped)
     .slice(0, MAX_PETS - (state.petLevel > 0 ? 1 : 0));          // 收纳箱里的宠物 + 出战宠物 ≤ 6
   if (state.date !== today()) { state.completed = []; state.date = today(); } // 每日重置打卡
   const p = state.pet = { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0, ...state.pet };
@@ -558,26 +552,54 @@ function renderPetBox() {                                  // 「我的宠物 n/
   else list.append(el('div', { className: 'hint', style: 'margin-top:8px', textContent: '宠物已满 6 只，想领养新的请先放生一只。' }));
 }
 function renderPet() {
-  const stage = PET_STAGES[state.petLevel], img = $('pet-img');
-  const hatched = state.petLevel > 0, pic = hatched ? petImage(state.petType, state.petLevel) : stage.img;
-  $('pet-name').textContent = hatched ? petType().name : stage.name;
-  $('pet-rank-text').textContent = stage.label;
-  if (img.dataset.src !== pic) {            // 仅在图片变化时才赋值，避免重复请求
+  const pt = PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
+  const img = $('pet-img');
+  const hatched = state.petLevel > 0;
+  
+  let currentStage = pt.stages[0];
+  for (let i = pt.stages.length - 1; i >= 0; i--) {
+    if (state.petLevel >= pt.stages[i].level) {
+      currentStage = pt.stages[i];
+      break;
+    }
+  }
+
+  $('pet-name').textContent = hatched ? currentStage.name : '神秘宠物蛋';
+  $('pet-rank-text').textContent = hatched ? `Lv.${state.petLevel} (${pt.rarity})` : '等待孵化 🥚';
+  
+  const pic = hatched ? currentStage.img : 'pet/Egg.jpg';
+  if (img.dataset.src !== pic) {
     img.dataset.src = pic;
     img.onerror = () => { img.onerror = null; img.src = FALLBACK_IMG; };
     img.src = pic;
   }
-  const b = $('pet-btn'), next = PET_STAGES[state.petLevel + 1];
-  b.disabled = !next && state.petLevel > 0;
+
+  const b = $('pet-btn');
   if (state.petLevel === 0) {
-    b.dataset.action = 'hatch'; b.textContent = `🥚 消耗 ${HATCH_COST} 金币孵化神秘宠物蛋！`;
+    b.dataset.action = 'hatch'; 
+    b.textContent = `🥚 消耗 ${HATCH_COST} 金币孵化神秘宠物蛋！`;
     b.style.background = 'linear-gradient(135deg,#ffb800,#ff4d4d)';
   } else {
-    b.dataset.action = 'evolve';
-    b.textContent = next ? `✨ 进化宠物（需累计 ${next.needStars} 颗星星）` : '👑 已达最高形态';
-    b.style.background = next ? 'linear-gradient(135deg,#4318ff,#68e1fd)' : '';
+    if (state.petLevel >= 100) {
+      b.disabled = true;
+      b.dataset.action = '';
+      b.textContent = '👑 已达最高等级 (Lv.100)';
+      b.style.background = '#ccc';
+    } else {
+      const expNeeded = Math.floor(100 + state.petLevel * 30 + Math.pow(state.petLevel, 1.8));
+      b.dataset.action = 'evolve';
+      b.disabled = false;
+      if (state.petExp >= expNeeded) {
+        b.textContent = `✨ 经验已满！点击突破到 Lv.${state.petLevel + 1}`;
+        b.style.background = 'linear-gradient(135deg,#ffb800,#ff4d4d)';
+      } else {
+        b.textContent = `还需 ${expNeeded - state.petExp} 经验升级`;
+        b.style.background = '#a3aed0'; 
+      }
+    }
   }
 }
+  
 const equippedNames = () => SLOTS.map(k => state.equipped[k]?.name).filter(Boolean);
 const owned = name => state.inventory.some(x => x.name === name) || equippedNames().includes(name);
 const isDup = (it, i) => state.inventory.some((x, j) => j !== i && x.name === it.name) || equippedNames().includes(it.name);
@@ -759,6 +781,19 @@ function care(k, mood, bond, cost) {
   $('pet-say').textContent = '🐾 ' + SAYS[k][Math.floor(Math.random() * SAYS[k].length)];
 }
 const ACTIONS = {
+    tAddExp() { 
+    if (!isTest()) return; 
+    state.petExp = (state.petExp || 0) + 1000; 
+    render(); 
+    toast('✨ +1000 经验'); 
+  },
+  tMaxLevel() { 
+    if (!isTest()) return; 
+    state.petLevel = 100; 
+    state.petExp = 0; 
+    render(); 
+    toast('🚀 宠物已直接满级到 Lv.100'); 
+  },
   // 装备大厅音乐
   equipHomeBgm(arg) {
     const id = (typeof arg === 'object' && arg !== null) ? (arg.id || arg.arg) : arg;
@@ -853,10 +888,19 @@ const ACTIONS = {
     render(); toast(`已放生「${name}」`);
   },
   evolve() {
-    const next = PET_STAGES[state.petLevel + 1];
-    if (!next) return toast('👑 宠物已是最高形态');
-    if (state.stars < next.needStars) return toast(`❌ 星星不足：当前 ${state.stars} 颗，需要 ${next.needStars} 颗`);
-    state.petLevel++; render(); toast(`🌟 进化成功：${next.label}`);
+    if (state.petLevel < 1) return;
+    if (state.petLevel >= 100) return toast('👑 宠物已是最高形态');
+    
+    const expNeeded = Math.floor(100 + state.petLevel * 30 + Math.pow(state.petLevel, 1.8));
+    if ((state.petExp || 0) < expNeeded) {
+      return toast(`❌ 经验不足：还需要 ${expNeeded - (state.petExp || 0)} 经验才能突破`);
+    }
+    
+    state.petExp -= expNeeded;
+    state.petLevel++;
+    
+    render(); 
+    toast(`🌟 突破成功！当前等级 Lv.${state.petLevel}`);
   },
   equip({ id }) {
     const it = state.inventory.splice(+id, 1)[0];
@@ -1284,9 +1328,14 @@ function resetState() {
       btn('🥚 变回宠物蛋（重新抽宠物）', 'tEgg', {}),
       btn('🪙 +1000 金币', 'tCoins', {}),
       btn('⭐ +100 星星', 'tStars', {}),
-      btn('⬆️ 宠物升一级', 'tLevel', {}),
+      
+      // 👇 新增的经验测试工具
+      btn('✨ +1000 经验', 'tAddExp', {}, 'btn-action'),
+      btn('🚀 宠物直接满级 (Lv.100)', 'tMaxLevel', {}, 'btn-action btn-gold'),
+      
       btn('🐾 补满 6 只宠物', 'tFill', {}),
-      btn('🧹 清空所有宠物', 'tClear', {}))));
+      btn('🧹 清空所有宠物', 'tClear', {})
+    ))));
 })();
 
 async function claim() {                                   // 领取：老师发的、签到的、好友送的金币，以及好友送的配件
