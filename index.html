@@ -1175,9 +1175,22 @@ Auth.ready.then(async () => {
     await claim();
   } catch (e) { toast('⚠️ 暂时无法同步存档，请检查网络'); }
   
-  render(); 
+render(); 
   renderMessages();                        
-  playHomeBgm(); // 🎵 新人进游戏自动播放大厅背景音乐！
+  
+  // 🎵 尝试直接播放大厅背景音乐
+  playHomeBgm(); 
+
+  // 💡 如果浏览器拦截了自动播放，监听玩家在网页上的第一次点击来唤醒音乐
+  const unlockAudio = () => {
+    if (player.paused && !player.muted) {
+      playHomeBgm();
+    }
+    document.removeEventListener('click', unlockAudio);
+    document.removeEventListener('keydown', unlockAudio);
+  };
+  document.addEventListener('click', unlockAudio);
+  document.addEventListener('keydown', unlockAudio);
 
   setInterval(() => { Auth.updateHeartbeat(); }, 60000);
   Auth.updateHeartbeat();
