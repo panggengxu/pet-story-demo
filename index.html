@@ -1298,6 +1298,7 @@ function openDuelRoom(duelId, isDefender = false) {
   $('duel-title').textContent = isDefender ? '⚔️ 迎战！' : '⚔️ 对战中...';
   
   $('duel-body').replaceChildren(
+    buildArena(),
     el('div', { id: 'duel-hp-area', style: 'display:flex;justify-content:space-between;margin-top:10px;font-size:.85rem' }),
     el('div', { id: 'duel-log', style: 'height:120px;overflow-y:auto;background:var(--soft);padding:8px;border-radius:8px;font-size:.85rem;margin-top:12px;line-height:1.5' },
       el('div', { textContent: '正在连接对战服务器...' })
