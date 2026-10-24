@@ -51,7 +51,7 @@ const Auth = (() => {
     FR = (rs[12].error ? [] : rs[12].data).map(x => ({ id: x.id, status: x.status, otherId: x.other_id, code: x.code, name: x.name,
       className: x.class_name, petLevel: x.pet_level, power: x.power, online: !!x.online }));   // online 由数据库按“2 分钟内有心跳”算好
     DU = (rs[13].error ? [] : rs[13].data).map(x => ({ id: x.id, time: Date.parse(x.created_at), iAmChallenger: x.i_am_challenger, oppName: x.opp_name,
-      win: x.win, myPower: x.my_power, oppPower: x.opp_power, rounds: x.rounds, myPet: x.my_pet, oppPet: x.opp_pet, unseen: x.unseen }));
+      win: x.win, myPower: x.my_power, oppPower: x.opp_power, rounds: x.rounds, myPet: x.my_pet, oppPet: x.opp_pet, unseen: x.unseen, finished: x.finished !== false }));   // 旧函数没有 finished 列时，当作已结束
     const tcm = {};
     tc.forEach(x => (tcm[x.teacher_id] ||= []).push(x.class_id));
     U = p.map(x => ({ uid: x.user_id, id: x.code, name: x.name, role: x.role, gender: x.gender || 'M', admin: x.is_admin, classId: x.class_id, classIds: tcm[x.user_id] || [] }));
