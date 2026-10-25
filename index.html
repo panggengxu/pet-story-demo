@@ -107,6 +107,79 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .skill-btn:hover:not(:disabled) { background: #3311cc; transform: scale(1.05); }
 .skill-btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
 .skill-desc { font-size: 0.7rem; color: #fff; opacity: 0.8; margin-top: 4px; font-weight: normal; }
+.rank-tab-btn { background:var(--bg); border:1px solid var(--border); padding:5px 10px; border-radius:8px; font-weight:600; font-size:.78rem; cursor:pointer; color:var(--text); transition:.2s; }
+.rank-tab-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+.team-item-card { display:flex; align-items:center; gap:10px; background:var(--soft); padding:8px 12px; border-radius:10px; margin-bottom:8px; border:1px solid var(--border); }
+/* ===== 战力榜卡片专属样式 ===== */
+.stat-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,.03);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 6px;
+}
+.stat-purple::before { background: var(--primary); }
+.stat-gold::before { background: var(--accent); }
+.stat-active::before { background: #9d4edd; }
+
+.stat-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+}
+.stat-value span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.stat-rank {
+  font-size: 0.7rem;
+  background: #eeeaff;
+  color: var(--primary);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: bold;
+  display: inline-block;
+  margin-top: 6px;
+}
+.stat-desc {
+  font-size: 0.75rem;
+  color: var(--text);
+  font-weight: 600;
+  margin-top: 6px;
+  background: var(--soft);
+  padding: 2px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+.stat-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--soft);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
 </style>
 </head>
 <body>
@@ -124,6 +197,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
       <button class="tab-btn" role="tab" data-action="tab" data-id="home" aria-selected="true">🏠 首页</button>
       <button class="tab-btn" role="tab" data-action="tab" data-id="shop" aria-selected="false">🛒 宠物商店与抽奖</button>
       <button class="tab-btn" role="tab" data-action="tab" data-id="music" aria-selected="false">🎵 音乐盒</button>
+      <button class="tab-btn" role="tab" data-action="tab" data-id="ranking" aria-selected="false">🏆 战力榜</button>
       <button class="tab-btn" role="tab" data-action="tab" data-id="hof" aria-selected="false">🏆 封神榜</button>
       <button class="tab-btn" role="tab" data-action="tab" data-id="social" aria-selected="false">💬 留言与好友</button>
     </div>
@@ -213,6 +287,73 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
     </div>
   </div>
 
+    <!-- 🏆 战力榜（独立分页） -->
+  <div id="tab-ranking" class="section-view" role="tabpanel">
+    <div class="card">
+      <div class="card-title">PET POWER LEADERBOARD</div>
+      <div class="card-heading">🏆 补习中心宠物战力天梯榜</div>
+      <div class="hint" style="margin-bottom:12px">全校同学的多宠物战力实时对决！支持切换全校或同班，支持查看任意同学的宠物阵容。</div>
+
+      <!-- 顶部三张卡片 -->
+      <section style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px; margin-bottom:16px;">
+        <!-- 卡片1：全队总战力 -->
+        <div class="stat-card stat-purple">
+          <div>
+            <div class="stat-label">全队总战力 (6只相加)</div>
+            <div class="stat-value" id="rk-team-total">0 <span>Pt</span></div>
+            <div class="stat-rank" id="rk-rank-info">全中心排名 -- · 同班 --</div>
+          </div>
+          <div class="stat-icon">🛡️</div>
+        </div>
+        <!-- 卡片2：王牌单体最高 -->
+        <div class="stat-card stat-gold">
+          <div>
+            <div class="stat-label">王牌单体最高战力</div>
+            <div class="stat-value" id="rk-max-single">0 <span>Pt</span></div>
+            <div class="stat-desc" id="rk-max-pet-name">🔥 暂无出战宠物</div>
+          </div>
+          <div class="stat-icon">⚡</div>
+        </div>
+        <!-- 卡片3：当前出战宠物 -->
+        <div class="stat-card stat-active">
+          <div>
+            <div class="stat-label">当前出战宠物</div>
+            <div class="stat-value" id="rk-active-power">0 <span>Pt</span></div>
+            <div class="stat-desc" id="rk-active-pet-name">🤖 暂无</div>
+          </div>
+          <div class="stat-icon">🤖</div>
+        </div>
+      </section>
+
+      <!-- 过滤控制栏 -->
+      <div style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; margin-bottom:16px;">
+        <!-- 范围选择 -->
+        <div style="background:var(--soft); padding:6px; border-radius:12px; display:flex; gap:6px;">
+          <button class="rank-tab-btn active" data-action="setRankScope" data-scope="all">🏫 全补习中心</button>
+          <button class="rank-tab-btn" data-action="setRankScope" data-scope="class">👥 我的班级</button>
+          <button class="rank-tab-btn" data-action="setRankScope" data-scope="friends">🤝 我的好友</button>
+        </div>
+        <!-- 榜单类型 -->
+        <div style="background:var(--soft); padding:6px; border-radius:12px; display:flex; gap:6px;">
+          <button class="rank-tab-btn active" data-action="setRankMetric" data-metric="total">🏆 全队总战力</button>
+          <button class="rank-tab-btn" data-action="setRankMetric" data-metric="single">⚡ 最强单体</button>
+        </div>
+      </div>
+
+      <div id="rank-list"></div>
+    </div>
+  </div>
+
+  <!-- 查看阵容弹窗 -->
+  <div id="team-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="查看同学阵容">
+    <div class="modal-box" style="text-align:left;width:min(420px,92vw)">
+      <h3 id="team-modal-title" style="margin-bottom:6px;color:var(--primary)"></h3>
+      <div id="team-modal-stats" class="hint" style="margin-bottom:12px"></div>
+      <div id="team-modal-list"></div>
+      <button class="btn-action btn-block" style="margin-top:12px" data-action="close">关闭</button>
+    </div>
+  </div>
+
   <div id="tab-hof" class="section-view" role="tabpanel">
     <div class="card">
       <div class="card-title">HALL OF FAME</div>
@@ -246,8 +387,6 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
           <button class="btn-action" data-action="addFriend">加好友</button>
         </div>
         <div id="fr-req"></div>
-        <div class="card-title" style="margin-top:8px">好友战力排行榜</div>
-        <div id="rank-list"></div>
         <div class="card-title" style="margin-top:12px">⚔️ 对战记录</div>
         <div id="duel-list"></div>
         <div class="hint" style="margin-top:6px">点好友旁边的“⚔️ 挑战”可以单挑：用双方出战宠物的战力对战，三局两胜，有运气成分，对方不用在线。每天最多挑战 10 次，其中最多 5 次有奖励（赢 10🪙+1⭐，输 2🪙），同一位好友每天只有第一次有奖励。</div>
@@ -485,7 +624,7 @@ function load(remote) {                                   // remote：云端存�
 let synced = false;
 const todayStr = today();
 let lastLoginDate = localStorage.getItem('pets_last_login');
-const pushSave = now => Auth.pushMySave(state, now, { power: calcPower(), pet_level: state.petLevel, pet_type: state.petType });   // 战力一起上传，好友排行榜用                                        // 云端存档读取完成后才允许上传，避免旧数据覆盖云端
+const pushSave = now => Auth.pushMySave(state, now, { power: calcPower(), total_power: calcTotalTeamPower(), max_power: calcMaxSinglePower(), pet_level: state.petLevel, pet_type: state.petType });   // 战力一起上传，好友排行榜用                                        // 云端存档读取完成后才允许上传，避免旧数据覆盖云端
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch {}
   if (synced) pushSave(false);
@@ -576,17 +715,6 @@ function renderDuels() {                                   // 对战记录（最
 
 function renderRank() {                                    // 好友战力排行榜 + 好友申请
   const fr = Auth.friends();
-    const rows = [{ name: me.name + '（我）', power: calcPower(), me: true },
-    ...fr.filter(f => f.status === 'accepted').map(f => ({ name: f.name, cls: f.className, power: f.power, id: f.id, other: f.otherId, isOnline: !!f.online }))
-  ].sort((a, b) => b.power - a.power);
-  $('rank-list').replaceChildren(...rows.map((r, i) => el('div', { className: 'rank-item', style: r.me ? 'background:#eeeaff;border-radius:8px' : '' },
-        el('span', { style: 'display:flex;align-items:center;gap:6px' }, 
-      el('span', { textContent: `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name}${r.cls ? '（' + r.cls + '）' : ''} · 战力 ${r.power}` }),
-      r.me ? '' : el('span', { style: `flex:none;width:10px;height:10px;border-radius:50%;background:${r.isOnline ? '#05cd99' : '#ccc'}`, title: r.isOnline ? '在线（2 分钟内活跃）' : '离线' })
-    ),
-    r.me ? '' : el('span', { style: 'display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end' },
-      btn('⚔️ 挑战', 'duelFriend', { id: r.other }), btn('🎁 送礼物', 'giftFriend', { id: r.other }), btn('删除', 'removeFriend', { id: r.id }, 'unequip')))));
-  if (rows.length === 1) $('rank-list').append(el('div', { className: 'hint', textContent: '还没有好友，输入同学的学号加好友，一起比拼战力吧！' }));
   const box = $('fr-req'); box.replaceChildren();
   fr.filter(f => f.status === 'incoming').forEach(f => box.append(el('div', { className: 'rank-item' },
     el('span', { textContent: `📩 ${f.name}${f.className ? '（' + f.className + '）' : ''} 想加你为好友` }),
@@ -870,7 +998,178 @@ function care(k, mood, bond, cost) {
   render(); 
   $('pet-say').textContent = `🐾 ${SAYS[k][Math.floor(Math.random() * SAYS[k].length)]} (+${expGain} 经验)`;
 }
+
+// === 新增的全队战力计算 ===
+function calcSinglePetPower(entry) {
+  if (!entry || !entry.level || entry.level < 1) return 0;
+  const pt = PET_TYPES.find(t => t.id === entry.type) || PET_TYPES[0];
+  const multiplier = pt.powerMultiplier || 1.0;
+  const basePower = Math.floor(50 + (entry.level * 20) + Math.pow(entry.level, 1.5));
+  const gearPowerTotal = SLOTS.reduce((n, k) => n + gearPower(entry.equipped?.[k]), 0);
+  const mood = entry.pet?.mood ?? 60;
+  const bond = entry.pet?.bond ?? 0;
+  const raw = (basePower + gearPowerTotal) * multiplier;
+  return Math.round(raw * (mood < 15 ? 0.9 : 1)) + Math.floor(bond / 10);
+}
+function getAllPetsList() {
+  const list = [];
+  if (state.petLevel > 0) list.push({ ...activeAsEntry(), isActive: true });
+  state.box.forEach(b => list.push({ ...b, isActive: false }));
+  return list;
+}
+function calcTotalTeamPower() { return getAllPetsList().reduce((sum, p) => sum + calcSinglePetPower(p), 0); }
+function calcMaxSinglePower() { const powers = getAllPetsList().map(p => calcSinglePetPower(p)); return powers.length ? Math.max(...powers) : 0; }
+
+// === 排行榜逻辑 ===
+let currentRankScope = 'all';  
+let currentRankMetric = 'total'; 
+
+async function renderRankingList() {
+  const listBox = $('rank-list');
+  if (!listBox) return;
+
+  // 更新按钮高亮状态
+  document.querySelectorAll('[data-action="setRankScope"]').forEach(b => b.classList.toggle('active', b.dataset.scope === currentRankScope));
+  document.querySelectorAll('[data-action="setRankMetric"]').forEach(b => b.classList.toggle('active', b.dataset.metric === currentRankMetric));
+
+    // 👇 动态更新顶部三个数据卡片
+  const myTotal = calcTotalTeamPower();
+  const myMax = calcMaxSinglePower();
+  const myActive = calcPower();
+  
+  // 计算王牌宠物
+  const allPets = getAllPetsList();
+  let maxPetInfo = '暂无出战宠物';
+  if (allPets.length > 0) {
+    const maxPet = allPets.reduce((a, b) => calcSinglePetPower(a) > calcSinglePetPower(b) ? a : b);
+    const pt = PET_TYPES.find(t => t.id === maxPet.type) || PET_TYPES[0];
+    maxPetInfo = `🔥 ${pt.name} (Lv.${maxPet.level})`;
+  }
+
+  // 计算当前出战宠物
+  let activeInfo = '暂无';
+  if (state.petLevel > 0) {
+    const pt = PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
+    const eqCount = Object.values(state.equipped).filter(Boolean).length;
+    activeInfo = `⚔️ ${pt.name} (${eqCount}/6 装备)`;
+  }
+
+  $('rk-team-total').innerHTML = `${myTotal} <span>Pt</span>`;
+  $('rk-max-single').innerHTML = `${myMax} <span>Pt</span>`;
+  $('rk-active-power').innerHTML = `${myActive} <span>Pt</span>`;
+  $('rk-max-pet-name').textContent = maxPetInfo;
+  $('rk-active-pet-name').textContent = activeInfo;
+  // 👆 更新完毕
+
+  listBox.innerHTML = '<div class="hint" style="text-align:center;padding:20px;">正在加载战力数据...</div>';
+
+  try {
+    // 调用刚才新建的数据库函数
+    const { data: dbList, error } = await Auth.sb.rpc('get_leaderboard', { p_scope: currentRankScope });
+    if (error) throw error;
+
+        // 👇 计算全中心和班级排名
+    const allSorted = [...dbList].sort((a, b) => (b.total_power || 0) - (a.total_power || 0));
+    const classSorted = allSorted.filter(x => x.class_name === myClassName);
+    const myUid = me.id;
+    
+    const centerRank = allSorted.findIndex(x => x.code === myUid) + 1;
+    const classRank = classSorted.findIndex(x => x.code === myUid) + 1;
+    
+    if (centerRank > 0) {
+      $('rk-rank-info').textContent = `全中心排名 #${centerRank} · 同班 #${classRank}`;
+    } else {
+      $('rk-rank-info').textContent = `暂未上榜`;
+    }
+
+    let candidates = dbList.map(u => ({
+      name: u.name + (u.code === me.id ? '（我）' : ''),
+      cls: u.class_name,
+      totalPower: u.total_power || 0,
+      maxPower: u.max_power || 0,
+      isFriend: u.is_friend,
+      me: u.code === me.id,
+      other: u.user_id,
+      rawSave: u.save_data
+    }));
+
+    // 排序
+    candidates.sort((a, b) => currentRankMetric === 'total' ? (b.totalPower - a.totalPower) : (b.maxPower - a.maxPower));
+
+        window.currentCandidates = candidates;
+    // 渲染列表
+    listBox.replaceChildren(...candidates.map((r, i) => {
+      const val = currentRankMetric === 'total' ? r.totalPower : r.maxPower;
+      const label = currentRankMetric === 'total' ? '总战力' : '单体最高';
+      return el('div', { className: 'rank-item', style: r.me ? 'background:#eeeaff;border-radius:8px' : '' },
+        el('span', { style: 'display:flex;align-items:center;gap:6px' }, 
+          el('span', { textContent: `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name}${r.cls ? '（' + r.cls + '）' : ''} · ${label} ${val}` })
+        ),
+        el('span', { style: 'display:flex;gap:4px;align-items:center;justify-content:flex-end' },
+          btn('🔍 阵容', 'inspectTeam', { id: r.me ? 'me' : r.other }),
+          r.me ? '' : (r.isFriend ? btn('⚔️ 挑战', 'duelFriend', { id: r.other }) : '')
+        )
+      );
+    }));
+
+    if (candidates.length === 0) {
+      listBox.append(el('div', { className: 'hint', textContent: '暂无排行数据，快去养宠物吧！' }));
+    }
+  } catch (e) {
+    console.error(e);
+    listBox.innerHTML = '<div class="hint" style="color:red;text-align:center;padding:20px;">加载失败，请检查网络或联系老师。</div>';
+  }
+}
+
 const ACTIONS = {
+    setRankScope({ scope }) { currentRankScope = scope; renderRankingList(); },
+  setRankMetric({ metric }) { currentRankMetric = metric; renderRankingList(); },
+  inspectTeam({ id }) {
+    let targetName = '';
+    let targetPets = [];
+    
+    if (id === 'me') {
+      targetName = me.name + '（我）';
+      targetPets = getAllPetsList();
+    } else {
+      // 从排行榜已经拉下来的数据里找
+      const row = window.currentCandidates?.find(c => c.other === id);
+      if (row) {
+        targetName = row.name;
+      if (row.rawSave) {
+        // 👇 加个类型判断，防止某些数据库传过来的是纯文本 JSON
+        const s = typeof row.rawSave === 'string' ? JSON.parse(row.rawSave) : row.rawSave;
+        
+        if (s.petLevel > 0) {
+          targetPets.push({ type: s.petType, level: s.petLevel, pet: s.pet || freshPet(), equipped: s.equipped || emptyGear(), isActive: true });
+        }
+        if (s.box && Array.isArray(s.box)) {
+          s.box.forEach(b => targetPets.push({ ...b, isActive: false }));
+        }
+      }
+      }
+    }
+
+    $('team-modal-title').textContent = `🐾 ${targetName || '未知'} 的宠物阵容`;
+    const list = $('team-modal-list'); list.replaceChildren();
+    
+    if (!targetPets.length) {
+      list.append(el('div', { className: 'hint', textContent: '暂未公开具体阵容，或者对方还没有宠物。' }));
+    } else {
+      targetPets.forEach(p => {
+        const pt = PET_TYPES.find(t => t.id === p.type) || PET_TYPES[0];
+        list.append(el('div', { className: 'team-item-card' },
+          el('img', { src: petImageOf(p), style: 'width:48px;height:48px;border-radius:10px;' }),
+          el('div', { style: 'flex:1;font-weight:bold;font-size:.9rem;display:flex;align-items:center;gap:6px' }, 
+            pt.name, 
+            p.isActive ? el('span', { style: 'background:var(--ok);color:#fff;font-size:.65rem;padding:1px 6px;border-radius:6px', textContent: '出战' }) : ''
+          ),
+          el('div', { style: 'font-weight:bold;color:var(--primary)' }, `⚔️ ${calcSinglePetPower(p)}`)
+        ));
+      });
+    }
+    openModal('team-modal');
+  },
     tAddExp() { 
     if (!isTest()) return; 
     state.petExp = (state.petExp || 0) + 1000; 
