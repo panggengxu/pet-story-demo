@@ -1249,6 +1249,20 @@ const ACTIONS = {
   tab({ id }) {
     document.querySelectorAll('.section-view').forEach(v => v.classList.toggle('active', v.id === 'tab-' + id));
     document.querySelectorAll('.tab-btn').forEach(b => b.setAttribute('aria-selected', b.dataset.id === id));
+    
+    // 👇 新增：如果切换到战力榜，则开启 10 秒自动刷新
+    if (id === 'ranking') {
+      renderRankingList();
+      if (window.rankTimer) clearInterval(window.rankTimer);
+      window.rankTimer = setInterval(() => {
+        if (document.getElementById('tab-ranking').classList.contains('active')) {
+          renderRankingList();
+        }
+      }, 10000); 
+    } else {
+      // 👇 如果离开战力榜，则停止刷新，节省资源
+      if (window.rankTimer) clearInterval(window.rankTimer);
+    }
   },
   cheat() { state.coins += 500; render(); toast('🪙 已增加 500 金币（调试）'); },
   hatch() { ACTIONS.adopt(); },
