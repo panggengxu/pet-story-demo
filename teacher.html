@@ -670,8 +670,23 @@ const A = {
   },
   allsubj(s) {                                             // 该科目：全班一键勾选；已全勾则取消
     const { d, k } = rState(), all = Auth.records(), key = rKey(d, k, s), ids = students().map(u => u.id);
-    all[key] = ids.every(id => (all[key] || []).includes(id)) ? [] : ids;
-    Auth.saveRecords(all); renderRoster();
+    const isAllDone = ids.every(id => (all[key] || []).includes(id));
+    all[key] = isAllDone ? [] : ids;
+    
+    // 👇 新增：全勾/全取消时，批量发/扣经验
+    let expAmount = 0;
+    if (k === '签到') expAmount = 20;
+    if (k === '默写' || k === '功课') expAmount = 30;
+    
+    if (expAmount > 0 && ids.length) {
+      const sign = isAllDone ? -1 : 1; // 如果是取消全勾，就扣经验
+      ids.forEach(id => {
+        Auth.grant(id, 0, 0, `${sign > 0 ? '批量完成' : '批量取消'}${k}：${s}`, expAmount * sign); 
+      });
+    }
+    
+    Auth.saveRecords(all); renderRoster(); 
+    if (!isAllDone && expAmount > 0) toast('已全班打勾，并发放了经验奖励！');
   },
   copyTodo() {                                             // 复制成文字，方便发给家长或同事
     const { d, k } = rState(), recs = Auth.records(), stu = students();
@@ -716,19 +731,50 @@ $('h-who').onchange = () => {                              // 选了在校学生
   if (u) { $('h-name').value = u.name; $('h-cls').value = curClassName(); }
 };
 $('t-filter').onchange = renderTopics;
-document.addEventListener('change', e => {                 // 主题名单：勾选自动保存
+document.addEventListener('change', e => {                 // 主题名单：勾选自动保存 + 发奖励
   const c = e.target.closest('[data-tid]');
   if (!c) return;
   const all = Auth.topics(), t = all.find(x => x.id === c.dataset.tid);
   if (!t) return;
-  const set = new Set(t.done); c.checked ? set.add(c.dataset.tsid) : set.delete(c.dataset.tsid);
+  const set = new Set(t.done); 
+  
+  if (c.checked) {
+    set.add(c.dataset.tsid); 
+    Auth.grant(c.dataset.tsid, 30, 0, `完成主题：${t.title}`, 30);
+    toast(`✅ 已打勾，学生获得 30🪙 + 30经验`);
+  } else {
+    set.delete(c.dataset.tsid);
+    Auth.grant(c.dataset.tsid, -30, 0, `取消主题：${t.title}`, -30);
+    toast(`↩️ 已取消，扣回 30🪙 和 30经验`);
+  }
+  
   t.done = [...set]; Auth.saveTopics(all); renderTopicSum();
 });
-document.addEventListener('change', e => {                 // 勾选/取消勾选，自动保存
+document.addEventListener('change', e => {                 // 勾选/取消勾选，自动保存并发经验
   const c = e.target.closest('[data-sid]');
   if (!c) return;
   const { d, k } = rState(), all = Auth.records(), key = rKey(d, k, c.dataset.subj), set = new Set(all[key] || []);
-  c.checked ? set.add(c.dataset.sid) : set.delete(c.dataset.sid);
+  
+  // 👇 1. 算出该给多少经验
+  let expAmount = 0;
+  if (k === '签到') expAmount = 20;
+  if (k === '默写' || k === '功课') expAmount = 30;
+
+  // 👇 2. 根据打勾/取消，发正数或负数经验
+  if (c.checked) {
+    set.add(c.dataset.sid);
+    if (expAmount > 0) {
+      Auth.grant(c.dataset.sid, 0, 0, `${k}：${c.dataset.subj}`, expAmount);
+      toast(`✅ 已打勾，学生获得 ${expAmount} 经验`);
+    }
+  } else {
+    set.delete(c.dataset.sid);
+    if (expAmount > 0) {
+      Auth.grant(c.dataset.sid, 0, 0, `取消${k}：${c.dataset.subj}`, -expAmount);
+      toast(`↩️ 已取消，扣回 ${expAmount} 经验`);
+    }
+  }
+  
   all[key] = [...set]; Auth.saveRecords(all); renderSum();
 });
 Auth.SUBJECTS.forEach(x => $('p-subj').append(new Option(x, x)));

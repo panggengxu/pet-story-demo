@@ -136,14 +136,32 @@ const Auth = (() => {
       const add = b.filter(c => !a.includes(c)), del = a.filter(c => !b.includes(c));
       if (add.length) ops.push(async () => ck(await sb.from('records').upsert(add.map(c => ({ day, kind, subject, student_id: uidOf(c) })), { onConflict: 'day,kind,subject,student_id', ignoreDuplicates: true })));
       if (del.length) ops.push(async () => ck(await sb.from('records').delete().eq('day', day).eq('kind', kind).eq('subject', subject).in('student_id', del.map(uidOf))));
-      if (kind === CHECKIN) {                                        // 签到：每勾一科自动发奖励，取消勾选就扣回
+      // 签到 / 默写 / 功课：自动发经验奖励，取消勾选就扣回
+      const isCheckin = (kind === CHECKIN);
+      const isHomework = (kind === '默写' || kind === '功课');
+      
+      if (isCheckin || isHomework) {
         const rows = [...add.map(c => [c, 1]), ...del.map(c => [c, -1])];
+        // 签到给 20 经验，默写/功课给 30 经验
+        const expReward = isCheckin ? 20 : 30; 
+        
         for (const [c, sign] of rows) {
           const o = PA[c] ||= { coins: 0, stars: 0 };
-          o.coins += sign * CHECKIN_REWARD.coins; o.stars += sign * CHECKIN_REWARD.stars;
+          if (isCheckin) { o.coins += sign * CHECKIN_REWARD.coins; o.stars += sign * CHECKIN_REWARD.stars; }
         }
-        if (rows.length) ops.push(async () => ck(await sb.from('awards').insert(rows.map(([c, sign]) => ({
-          student_id: uidOf(c), coins: sign * CHECKIN_REWARD.coins, stars: sign * CHECKIN_REWARD.stars, note: `签到：${subject}` })))));
+        
+        if (rows.length) {
+          ops.push(async () => {
+            const insertData = rows.map(([c, sign]) => ({
+              student_id: uidOf(c), 
+              coins: isCheckin ? sign * CHECKIN_REWARD.coins : 0, 
+              stars: isCheckin ? sign * CHECKIN_REWARD.stars : 0, 
+              exp: sign * expReward, // <-- 这里的 exp 会存进数据库
+              note: `${kind}：${subject}` 
+            }));
+            ck(await sb.from('awards').insert(insertData));
+          });
+        }
       }
     }
     return ops;
@@ -164,14 +182,15 @@ const Auth = (() => {
   }
 
   // ---- 奖励：老师发放 → 学生领取 ----
-  function grant(code, coins, stars, note) {
-    if (!coins && !stars) return;
-    const o = PA[code] ||= { coins: 0, stars: 0 };
-    o.coins += coins; o.stars += stars;
-    run([async () => ck(await sb.from('awards').insert({ student_id: uidOf(code), coins, stars, note: note || '' }))]);
+  function grant(code, coins, stars, note, exp = 0) {
+    if (!coins && !stars && !exp) return;
+    const o = PA[code] ||= { coins: 0, stars: 0, exp: 0 };
+    o.coins += coins; o.stars += stars; o.exp += exp;
+    run([async () => ck(await sb.from('awards').insert({ student_id: uidOf(code), coins, stars, exp, note: note || '' }))]);
   }
+  
   async function claimAwards() {
-    const { data, error } = await sb.from('awards').update({ claimed: true }).eq('claimed', false).select('coins,stars,note');
+    const { data, error } = await sb.from('awards').update({ claimed: true }).eq('claimed', false).select('coins,stars,exp,note');
     if (error) throw new Error(error.message);
     return data || [];
   }

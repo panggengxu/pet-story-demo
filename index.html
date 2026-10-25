@@ -149,7 +149,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
           <div class="card-title">TODAY'S MISSION</div>
           <div class="card-heading">五科学习签到 🎯</div>
           <div id="subjects-container"></div>
-          <div class="hint" style="margin-top:6px">签到由老师在补习中心帮你签，每签一科自动获得 10🪙 + 1⭐，在家不能自己签哦。</div>
+          <div class="hint" style="margin-top:6px">签到由老师在补习中心帮你签，每签一科自动获得 30🪙 + 1⭐ + 30经验，在家不能自己签哦。</div>
         </div>
       </div>
       <div>
@@ -483,6 +483,8 @@ function load(remote) {                                   // remote：云端存�
   if (p.day !== today()) { p.day = today(); p.feed = p.play = p.pat = 0; }
 }
 let synced = false;
+const todayStr = today();
+let lastLoginDate = localStorage.getItem('pets_last_login');
 const pushSave = now => Auth.pushMySave(state, now, { power: calcPower(), pet_level: state.petLevel, pet_type: state.petType });   // 战力一起上传，好友排行榜用                                        // 云端存档读取完成后才允许上传，避免旧数据覆盖云端
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch {}
@@ -568,7 +570,7 @@ function renderDuels() {                                   // 对战记录（最
     const when = new Date(d.time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     box.append(el('div', { className: 'rank-item' },
       el('span', { textContent: `${who}：${res}` }),
-      el('span', { className: 'hint', textContent: `${when}　战力 ${d.myPower} vs ${d.oppPower}` })));
+      el('span', { className: 'hint', textContent: `${when} 战力 ${d.myPower} vs ${d.oppPower}` })));
   });
 }
 
@@ -614,9 +616,13 @@ function renderPet() {
   const hatched = state.petLevel > 0;
   
   let currentStage = pt.stages[0];
+  let nextStage = null;
+
+  // 算出当前形态和下一个形态
   for (let i = pt.stages.length - 1; i >= 0; i--) {
     if (state.petLevel >= pt.stages[i].level) {
       currentStage = pt.stages[i];
+      nextStage = pt.stages[i + 1] || null;
       break;
     }
   }
@@ -637,26 +643,41 @@ function renderPet() {
     b.textContent = `🥚 消耗 ${HATCH_COST} 金币孵化神秘宠物蛋！`;
     b.style.background = 'linear-gradient(135deg,#ffb800,#ff4d4d)';
   } else {
-    // 👇 获取这只宠物的专属满级上限
     const currentMaxLv = pt.maxLv || 100;
+    const expNeeded = Math.floor(100 + state.petLevel * 30 + Math.pow(state.petLevel, 1.8));
+    const currentExp = state.petExp || 0;
+    
+    // 判定当前等级是否刚好在“上一个形态”且“经验已满”，并存在下一个形态
+    const isAtEvolutionThreshold = nextStage && state.petLevel === (nextStage.level - 1) && currentExp >= expNeeded;
 
-    if (state.petLevel >= currentMaxLv) {
+    if (isAtEvolutionThreshold) {
+      b.disabled = false;
+      b.dataset.action = 'evolve';
+      b.textContent = `✨ 可进化到【${nextStage.name}】（消耗 15 星星）`;
+      b.style.background = 'linear-gradient(135deg,#ff4b2b,#ff416c)'; // 亮红色高亮
+    } 
+    else if (state.petLevel >= currentMaxLv && !nextStage) {
       b.disabled = true;
       b.dataset.action = '';
-      b.textContent = `👑 已达最高等级 (Lv.${currentMaxLv})`;
+      b.textContent = `👑 已达最高等级和形态 (Lv.${currentMaxLv})`;
       b.style.background = '#ccc';
-    } else {
-      const expNeeded = Math.floor(100 + state.petLevel * 30 + Math.pow(state.petLevel, 1.8));
-      const currentExp = state.petExp || 0;
-      
-      b.dataset.action = 'evolve';
-      b.disabled = false;
-      if (currentExp >= expNeeded) {
-        b.textContent = `✨ 经验已满！点击突破到 Lv.${state.petLevel + 1}`;
-        b.style.background = 'linear-gradient(135deg,#ffb800,#ff4d4d)';
+    } 
+    else {
+      if (state.petLevel >= currentMaxLv) {
+         b.disabled = true;
+         b.dataset.action = '';
+         b.textContent = `👑 已达最高等级 (Lv.${currentMaxLv})`;
+         b.style.background = '#ccc';
       } else {
-        b.textContent = `还需 ${expNeeded - currentExp} 经验升级`;
-        b.style.background = '#a3aed0';
+         b.dataset.action = 'evolve'; // 普通升级逻辑
+         b.disabled = false;
+         if (currentExp >= expNeeded) {
+           b.textContent = `✨ 经验已满！点击升到 Lv.${state.petLevel + 1}`;
+           b.style.background = 'linear-gradient(135deg,#4318ff,#68e1fd)'; // 蓝色
+         } else {
+           b.textContent = `还需 ${expNeeded - currentExp} 经验升级`;
+           b.style.background = '#a3aed0'; 
+         }
       }
     }
   }
@@ -672,7 +693,7 @@ function renderNotices() {
   if (!all.length) return box.append(el('div', { className: 'hint', textContent: '老师还没有发布公告。' }));
   all.forEach(n => {
     const sb = Auth.sub(n, me.id), st = sb?.status;
-    const kids = [el('div', { textContent: `${n.important ? '⭐ 重要　' : ''}${Auth.KIND[n.type] || '🎯 任务'}${n.subject ? '｜' + n.subject : ''}　${n.title}`, style: 'font-weight:700;font-size:.9rem' })];
+    const kids = [el('div', { textContent: `${n.important ? '⭐ 重要 ' : ''}${Auth.KIND[n.type] || '🎯 任务'}${n.subject ? '｜' + n.subject : ''} ${n.title}`, style: 'font-weight:700;font-size:.9rem' })];
     if (n.body) kids.push(el('div', { className: 'hint', textContent: n.body, style: 'margin:2px 0' }));
     if (n.type !== 'notice') {
       if (st === 'rejected') kids.push(el('div', { textContent: `❌ 老师退回：${sb.reply || '请重新提交'}`, style: 'color:#d33;font-size:.82rem;margin-top:4px' }));
@@ -828,7 +849,7 @@ function renderMessages() {                                // 留言墙：同班
   posts.forEach(p => box.append(el('div', { className: 'msg-item' },
     el('div', { style: 'display:flex;justify-content:space-between;gap:6px;align-items:center' },
       el('span', {}, el('b', { textContent: `${p.role === 'teacher' ? '【老师】' : ''}${p.name}` }),
-        el('span', { className: 'hint', style: 'font-size:.75rem', textContent: `　${p.classId ? '同班' : '🌐 全部班级'}　${new Date(p.time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` })),
+        el('span', { className: 'hint', style: 'font-size:.75rem', textContent: ` ${p.classId ? '同班' : '🌐 全部班级'} ${new Date(p.time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` })),
       p.authorId === uid ? btn('删除', 'delPost', { id: p.id }, 'unequip') : ''),
     el('div', { textContent: p.body, style: 'margin-top:2px;overflow-wrap:anywhere' }))));
   if (all.length > wallShown) box.append(btn(`查看更多（还有 ${all.length - wallShown} 条）`, 'moreWall', {}, 'btn-action btn-block'));
@@ -843,7 +864,7 @@ function care(k, mood, bond, cost) {
   state.coins -= cost; p[k]++; p.mood = Math.min(100, p.mood + mood); p.bond += bond; 
   
   // 👇 新增：获取经验并累加
-  const expGain = k === 'feed' ? 20 : (k === 'play' ? 30 : 10);
+  const expGain = k === 'feed' ? 10 : (k === 'play' ? 15 : 5);
   state.petExp = (state.petExp || 0) + expGain;
   
   render(); 
@@ -858,10 +879,17 @@ const ACTIONS = {
   },
   tMaxLevel() { 
     if (!isTest()) return; 
-    state.petLevel = 100; 
-    state.petExp = 9999999; 
+    
+    // 1. 查出当前宠物的真实满级上限
+    const pt = PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
+    const currentMaxLv = pt.maxLv || 100;
+    
+    // 2. 动态设置满级
+    state.petLevel = currentMaxLv; 
+    state.petExp = 9999999; // 给足经验
+    
     render(); 
-    toast('🚀 宠物已直接满级到 Lv.100'); 
+    toast(`🚀 宠物已直接满级到 Lv.${currentMaxLv}（${pt.name}专属上限）`); 
   },
   // 装备大厅音乐
   equipHomeBgm(arg) {
@@ -959,22 +987,48 @@ const ACTIONS = {
   evolve() {
     if (state.petLevel < 1) return;
     
-    // 获取当前宠物品种的满级上限
     const pt = PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
     const currentMaxLv = pt.maxLv || 100;
     
+    let nextStage = null;
+    for (let i = pt.stages.length - 1; i >= 0; i--) {
+      if (state.petLevel >= pt.stages[i].level) {
+        nextStage = pt.stages[i + 1] || null;
+        break;
+      }
+    }
+
+    const expNeeded = Math.floor(100 + state.petLevel * 30 + Math.pow(state.petLevel, 1.8));
+    const currentExp = state.petExp || 0;
+    const isAtEvolutionThreshold = nextStage && state.petLevel === (nextStage.level - 1) && currentExp >= expNeeded;
+
+    // 1. 形态进化逻辑（消耗星星）
+    if (isAtEvolutionThreshold) {
+      if (state.stars < 15) {
+        return toast(`❌ 星星不足：进化到【${nextStage.name}】需要 15 颗星星`);
+      }
+      if (!confirm(`确定消耗 15 颗星星，让宠物进化到【${nextStage.name}】吗？`)) return;
+      
+      state.stars -= 15;
+      state.petExp -= expNeeded; // 扣除当前等级满的经验
+      state.petLevel++;          // 跨入新等级形态
+      
+      render(); 
+      return toast(`🌟 进化成功！当前形态：${nextStage.name} (Lv.${state.petLevel})`);
+    }
+
+    // 2. 普通经验升级逻辑
     if (state.petLevel >= currentMaxLv) return toast(`👑 该宠物最高只能升到 Lv.${currentMaxLv}`);
     
-    const expNeeded = Math.floor(100 + state.petLevel * 30 + Math.pow(state.petLevel, 1.8));
-    if ((state.petExp || 0) < expNeeded) {
-      return toast(`❌ 经验不足：还需要 ${expNeeded - (state.petExp || 0)} 经验才能突破`);
+    if (currentExp < expNeeded) {
+      return toast(`❌ 经验不足：还需要 ${expNeeded - currentExp} 经验才能突破`);
     }
     
     state.petExp -= expNeeded;
     state.petLevel++;
     
     render(); 
-    toast(`🌟 突破成功！当前等级 Lv.${state.petLevel}`);
+    toast(`🌟 升级成功！当前等级 Lv.${state.petLevel}`);
   },
   equip({ id }) {
     const it = state.inventory.splice(+id, 1)[0];
@@ -1360,7 +1414,7 @@ async function pollDuelState(duelId) {
       const isMyAttack = l.who === myUid;
       const skillName = ['普通攻击','强力猛击','终极必杀'][l.skill - 1];
       return el('div', { style: isMyAttack ? 'color:var(--primary);margin-bottom:4px' : 'color:#d33;margin-bottom:4px' }, 
-        `${isMyAttack ? '👉 你' : '🔥 对方'}使用了【${skillName}】，${l.dmg > 0 ? `造成 ${Math.round(l.dmg)} 点伤害！` : '被闪避了！'}`);
+        `${isMyAttack ? '👉 你' : '🔥 对方'}使用了【${skillName}】[cite: 16]，${l.dmg > 0 ? `造成 ${Math.round(l.dmg)} 点伤害！` : '被闪避了！'}`);
     }));
     if(logs.length) $('duel-log').scrollTop = $('duel-log').scrollHeight;
     
@@ -1369,6 +1423,16 @@ async function pollDuelState(duelId) {
     const skillArea = $('skill-area');
     
     if (d.winner) {
+        if (currentDuelId) {
+            if (d.winner === myUid) {
+                state.petExp = (state.petExp || 0) + 50;
+                toast('🏆 对战胜利！宠物获得 50 经验！');
+            } else {
+                state.petExp = (state.petExp || 0) + 15;
+          toast('💥 对战失败，宠物获得 15 安慰经验。');
+        }
+        save(); // 马上保存经验
+      }
       currentDuelId = null;                                 // 对战已经结束，关闭窗口时不用再确认
       Auth.refresh().then(renderDuels).catch(() => {});     // 马上把这一场记到“对战记录”里
       skillArea.style.display = 'none';
@@ -1459,22 +1523,35 @@ function resetState() {
       
       // 👇 新增的经验测试工具
       btn('✨ +1000 经验', 'tAddExp', {}, 'btn-action'),
-      btn('🚀 宠物直接满级 (Lv.100)', 'tMaxLevel', {}, 'btn-action btn-gold'),
+      btn('🚀 宠物直接满级', 'tMaxLevel', {}, 'btn-action btn-gold'),
       
       btn('🐾 补满 6 只宠物', 'tFill', {}),
       btn('🧹 清空所有宠物', 'tClear', {})
     )));
 })();
 
-async function claim() {                                   // 领取：老师发的、签到的、好友送的金币，以及好友送的配件
+async function claim() {                                   // 领取：老师发的、签到的、好友送的金币、星星和经验，以及好友送的配件
   notifyDuels().catch(() => {});
   const got = await Auth.claimAwards(), items = await Auth.claimGiftItems().catch(() => []);
-  const c = got.reduce((n, x) => n + x.coins, 0), t = got.reduce((n, x) => n + x.stars, 0), notes = [];
-  if (got.length) { state.coins = Math.max(0, state.coins + c); state.stars = Math.max(0, state.stars + t); notes.push(`${c}🪙 ${t}⭐`); }
+  
+  const c = got.reduce((n, x) => n + (x.coins || 0), 0);
+  const t = got.reduce((n, x) => n + (x.stars || 0), 0);
+  const e = got.reduce((n, x) => n + (x.exp || 0), 0); // <-- 计算总经验
+  const notes = [];
+  
+  if (got.length) { 
+    state.coins = Math.max(0, state.coins + c); 
+    state.stars = Math.max(0, state.stars + t); 
+    state.petExp = (state.petExp || 0) + e; // <-- 加上经验
+    if (c || t || e) notes.push(`${c}🪙 ${t}⭐ ${e}经验`); 
+  }
+
+  // 下面这部分是领取好友送的配件，保留原样
   items.forEach(x => {
     const base = POOL.find(p => p.name === x.item_name);   // 只认奖池里真实存在的配件
     if (base) { state.inventory.push({ ...base }); notes.push(`【${base.name}】（来自 ${x.sender_name}）`); }
   });
+
   if (!notes.length) return;
   save(); pushSave(true);
   toast(`🎁 你收到了 ${notes.join('、')}`);
@@ -1498,6 +1575,14 @@ Auth.ready.then(async () => {
     const remote = await Auth.fetchMySave();               
     if (remote) load(remote);
     synced = true;
+        // 👇 每日首次登录送经验
+    if (lastLoginDate !== todayStr) {
+      localStorage.setItem('pets_last_login', todayStr);
+      state.petExp = (state.petExp || 0) + 20;
+      state.coins = (state.coins || 0) + 50;
+      state.stars = (state.stars || 0) + 10;
+      toast('🎁 每日首次登录，宠物获得 20 经验、50 金币、10 星星！');
+    }
     await claim();
   } catch (e) { toast('⚠️ 暂时无法同步存档，请检查网络'); }
   
