@@ -719,6 +719,28 @@ function renderDuels() {                                   // 对战记录（最
 
 function renderRank() {                                    // 好友战力排行榜 + 好友申请
   const fr = Auth.friends();
+    const listBox = $('friends-list');
+  if (listBox) {
+    listBox.replaceChildren();
+    const accepted = fr.filter(f => f.status === 'accepted');
+    if (!accepted.length) {
+      listBox.append(el('div', { className: 'hint', textContent: '还没有好友，输入上方学号添加吧！' }));
+    } else {
+      accepted.forEach(f => {
+        listBox.append(el('div', { className: 'rank-item' },
+          el('span', { style: 'display:flex;align-items:center;gap:6px' },
+            el('span', { textContent: `${f.name}${f.className ? '（' + f.className + '）' : ''} · 战力 ${f.power || 0}` }),
+            el('span', { style: `flex:none;width:10px;height:10px;border-radius:50%;background:${f.online ? '#05cd99' : '#ccc'}`, title: f.online ? '在线' : '离线' })
+          ),
+          el('span', { style: 'display:flex;gap:4px' },
+            btn('⚔️ 挑战', 'duelFriend', { id: f.otherId }),
+            btn('🎁 送礼', 'giftFriend', { id: f.otherId }),
+            btn('删除', 'removeFriend', { id: f.id }, 'unequip')
+          )
+        ));
+      });
+    }
+  }
   const box = $('fr-req'); box.replaceChildren();
   fr.filter(f => f.status === 'incoming').forEach(f => box.append(el('div', { className: 'rank-item' },
     el('span', { textContent: `📩 ${f.name}${f.className ? '（' + f.className + '）' : ''} 想加你为好友` }),
