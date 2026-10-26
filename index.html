@@ -260,6 +260,9 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
             <button class="btn-action" data-action="tab" data-id="shop">去背包穿戴 🎒</button>
           </div>
           <div class="slots-grid" id="equipment-slots"></div>
+          <div style="margin-top:12px; text-align:right;">
+            <button class="btn-action btn-gold" data-action="openSkillModal">⚙️ 配置出战技能</button>
+          </div>
         </div>
       </div>
     </div>
@@ -464,6 +467,19 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
     </div>
   </div>
 </div>
+
+<div id="skill-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="配置技能">
+  <div class="modal-box" style="text-align:left">
+    <h3 style="margin-bottom:12px;color:var(--primary)">⚙️ 配置出战技能</h3>
+    <div class="hint" style="margin-bottom:10px">你可以从已解锁的技能中，挑选最多 4 个带入战斗。</div>
+    <div id="skill-config-list"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-action btn-block" data-action="saveSkills">保存配置</button>
+      <button class="btn-action btn-gold" data-action="close">取消</button>
+    </div>
+  </div>
+</div>
+  
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.100.1/dist/umd/supabase.js"></script>
 <script src="shared.js"></script>
@@ -624,7 +640,7 @@ const SAYS = {
 const today = () => new Date().toLocaleDateString('sv'); // 本地日期 YYYY-MM-DD
 const state = {
   coins: 500, stars: 10, completed: [], date: today(), unlockedMusic: [1,2], equippedHomeBgmId: 1, equippedFightBgmId: 2, inventory: [],
-  equipped: Object.fromEntries(SLOTS.map(s => [s, null])), petLevel: 0, petType: '', box: [], warehouse: [], messages: [],
+  equipped: Object.fromEntries(SLOTS.map(s => [s, null])), petLevel: 0, petType: '', box: [], warehouse: [], equippedSkills: [], messages: [],
   pet: { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0 }
 };
 const DEFAULT_STATE = JSON.stringify(state);                 // 初始存档的样子，测试工具“重置存档”用
@@ -1254,6 +1270,56 @@ const ACTIONS = {
     render(); 
     toast(`🚀 宠物已直接满级到 Lv.${currentMaxLv}（${pt.name}专属上限）`); 
   },
+
+  openSkillModal() {
+  const list = $('skill-config-list');
+  list.replaceChildren();
+  const type = state.petType, lv = state.petLevel;
+  if (!type || lv < 1) return toast('请先孵化宠物');
+  
+  const allAvailable = Auth.skills().filter(x => x.type === type && x.unlock <= lv);
+  if (!allAvailable.length) return toast('当前没有可用技能');
+
+  // 当前选中的技能（如果没有，默认选前4个）
+  let current = state.equippedSkills && state.equippedSkills.length > 0 
+    ? state.equippedSkills.filter(c => allAvailable.some(s => s.code === c))
+    : allAvailable.slice(0, 4).map(s => s.code);
+
+  allAvailable.forEach(sk => {
+    const isChecked = current.includes(sk.code);
+    const cb = el('input', { type: 'checkbox', className: 'chk', checked: isChecked });
+    cb.dataset.skillCode = sk.code;
+    cb.dataset.action = 'toggleSkill'; // 利用事件委托，或者直接在保存时读取
+    
+    // 限制最多选 4 个
+    cb.onchange = () => {
+      const checkedBoxes = list.querySelectorAll('input[type="checkbox"]:checked');
+      if (checkedBoxes.length > 4) {
+        cb.checked = false;
+        toast('最多只能选择 4 个技能哦！');
+      }
+    };
+
+    list.append(el('label', { style: 'display:flex; align-items:flex-start; gap:8px; padding:8px; border-bottom:1px solid var(--border); cursor:pointer' },
+      cb,
+      el('div', {},
+        el('div', { style: 'font-weight:bold' }, `${sk.emoji} ${sk.name}`),
+        el('div', { className: 'hint', style: 'font-size:.75rem' }, `${sk.desc} · 命中${sk.hit}% · 伤害×${sk.mult}`)
+      )
+    ));
+  });
+  openModal('skill-modal');
+},
+
+saveSkills() {
+  const checked = [...document.querySelectorAll('#skill-config-list input[type="checkbox"]:checked')].map(cb => Number(cb.dataset.skillCode));
+  if (checked.length === 0) return toast('请至少选择一个技能');
+  state.equippedSkills = checked;
+  save(); 
+  closeModals();
+  toast('✅ 出战技能已保存！');
+},
+  
   // 装备大厅音乐
   equipHomeBgm(arg) {
     const id = (typeof arg === 'object' && arg !== null) ? (arg.id || arg.arg) : arg;
@@ -1711,14 +1777,34 @@ function skillBtn(sk) {                                     // sk = 技能表里
   b.dataset.skill = String(sk.code);
   return b;
 }
-function fillSkills(type, lv) {                             // 按“这场对战开始时记下的品种和等级”显示技能
+function fillSkills(type, lv) {
   const area = $('skill-area');
   if (!area) return;
   type = type || state.petType; lv = lv || state.petLevel || 1;
-  const all = Auth.skills().filter(x => x.type === type);
-  const open = all.filter(x => x.unlock <= lv).slice(0, 4), locked = all.filter(x => x.unlock > lv);
+  
+  // 找出该品种、且等级满足的所有已解锁技能
+  const allAvailable = Auth.skills().filter(x => x.type === type && x.unlock <= lv);
+  const locked = Auth.skills().filter(x => x.type === type && x.unlock > lv);
+  
+  // 如果玩家配置过技能，优先用玩家配置的（且还在可用列表里）
+  let open = [];
+  if (state.equippedSkills && state.equippedSkills.length > 0) {
+    open = state.equippedSkills.map(code => allAvailable.find(s => s.code === code)).filter(Boolean);
+  }
+  
+  // 如果玩家没配置，或者配置的都失效了，就默认取前 4 个
+  if (open.length === 0) {
+    open = allAvailable.slice(0, 4);
+  }
+
   area.replaceChildren();
-  if (!all.length) return area.append(el('div', { className: 'hint', textContent: '这只宠物的技能表还没有建好（需要先运行 schema16.sql）。' }));
+  if (!Auth.skills().some(x => x.type === type)) {
+    return area.append(el('div', { className: 'hint', textContent: '这只宠物的技能表还没有建好。' }));
+  }
+  if (!open.length) {
+    return area.append(el('div', { className: 'hint', textContent: '还没有可用技能，快去升级吧！' }));
+  }
+
   area.append(el('div', { className: 'skill-grid' }, ...open.map(skillBtn)));
   if (locked.length) area.append(el('div', { className: 'skill-locked' },
     el('div', { className: 'hint', textContent: `🔒 还有 ${locked.length} 个技能没解锁（升级、进化后解锁）：` }),
