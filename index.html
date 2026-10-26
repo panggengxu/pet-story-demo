@@ -1376,6 +1376,16 @@ toWarehouse({ id }) {
   render(); 
   toast(`✅ 已存入仓库，随时可以再调出`);
 },
+  
+  swapPet({ id }) {                                        // 收纳箱里的宠物出战，当前出战的收起来
+    const i = +id, target = state.box[i];
+    if (!target) return;
+    const cur = state.petLevel > 0 ? activeAsEntry() : null;
+    loadEntry(target);
+    if (cur) state.box[i] = cur; else state.box.splice(i, 1);
+    render(); toast(`✅ 「${petType().name}」出战！`);
+  },
+  
   storePet() {                                             // 把出战的宠物收起来
     if (state.petLevel < 1) return;
     state.box.push(activeAsEntry()); emptyActive();
