@@ -624,7 +624,7 @@ const SAYS = {
 const today = () => new Date().toLocaleDateString('sv'); // 本地日期 YYYY-MM-DD
 const state = {
   coins: 500, stars: 10, completed: [], date: today(), unlockedMusic: [1,2], equippedHomeBgmId: 1, equippedFightBgmId: 2, inventory: [],
-  equipped: Object.fromEntries(SLOTS.map(s => [s, null])), petLevel: 0, petType: '', box: [], messages: [],
+  equipped: Object.fromEntries(SLOTS.map(s => [s, null])), petLevel: 0, petType: '', box: [], warehouse: [], messages: [],
   pet: { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0 }
 };
 const DEFAULT_STATE = JSON.stringify(state);                 // 初始存档的样子，测试工具“重置存档”用
@@ -635,7 +635,10 @@ function load(remote) {                                   // remote：云端存�
   if (state.petLevel < 1) state.petLevel = 0;
   if (state.petLevel > 0 && !PET_TYPES.some(t => t.id === state.petType)) state.petType = 'ender';
   state.box = (Array.isArray(state.box) ? state.box : []).filter(e => e && e.level > 0 && e.pet && e.equipped)
-    .slice(0, MAX_PETS - (state.petLevel > 0 ? 1 : 0));          // 收纳箱里的宠物 + 出战宠物 ≤ 6
+    .slice(0, MAX_PETS - (state.petLevel > 0 ? 1 : 0));   // 收纳箱里的宠物 + 出战宠物 ≤ 6
+  
+  state.warehouse = (Array.isArray(state.warehouse) ? state.warehouse : []).filter(e => e && e.level > 0 && e.pet && e.equipped);
+  
   if (state.date !== today()) { state.completed = []; state.date = today(); } // 每日重置打卡
   const p = state.pet = { mood: 60, bond: 0, tick: Date.now(), day: today(), feed: 0, play: 0, pat: 0, ...state.pet };
   const h = Math.floor((Date.now() - p.tick) / 36e5);   // 每过 1 小时，心情 -3
@@ -678,7 +681,7 @@ const closeModals = () => document.querySelectorAll('.modal-overlay').forEach(m 
 function render() {
   $('coins').textContent = state.coins;
   $('stars').textContent = state.stars;
-  renderPet(); renderPetBox(); renderCare(); renderRank(); renderDuels();  renderMessages(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
+  renderPet(); renderPetBox(); renderWarehouse(); renderCare(); renderRank(); renderDuels();  renderMessages(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
   save();
 }
 const gearPower = it => it ? (POOL.find(p => p.name === it.name)?.power ?? 0) : 0;
@@ -696,6 +699,24 @@ function calcPower() {
   // 总战力 = (基础 + 装备) * 倍率 * 心情惩罚 + 亲密度
   const raw = (basePower + gearPowerTotal) * multiplier;
   return Math.round(raw * (state.pet.mood < 15 ? 0.9 : 1)) + Math.floor(state.pet.bond / 10);
+}
+
+function renderWarehouse() {
+  const box = $('warehouse-list');
+  if (!box) return;
+  box.replaceChildren();
+  if (!state.warehouse || !state.warehouse.length) {
+    return box.append(el('div', { className: 'hint', textContent: '仓库空空如也，去领养更多宠物吧！' }));
+  }
+  state.warehouse.forEach((e, i) => {
+    const pt = PET_TYPES.find(t => t.id === e.type) || PET_TYPES[0];
+    box.append(el('div', { className: 'team-item-card', style: 'flex-direction:column; align-items:flex-start; width:160px; padding:12px' },
+      el('img', { src: petImageOf(e), style: 'width:100%; height:100px; object-fit:contain; background:var(--soft); border-radius:10px; margin-bottom:8px' }),
+      el('div', { style: 'font-weight:bold; font-size:.9rem' }, pt.name),
+      el('div', { className: 'hint', style: 'margin-bottom:8px' }, `Lv.${e.level} · 战力 ${calcSinglePetPower(e)}`),
+      btn('调出到收纳箱', 'swapWarehouse', { id: i }, 'btn-action btn-block')
+    ));
+  });
 }
   
 function renderCare() {
@@ -1309,23 +1330,35 @@ const ACTIONS = {
   },
   cheat() { state.coins += 500; render(); toast('🪙 已增加 500 金币（调试）'); },
   hatch() { ACTIONS.adopt(); },
-  adopt() {                                                // 领养新宠物：没有出战宠物就直接出战，否则放进收纳箱
-    if (petCount() >= MAX_PETS) return toast(`最多只能拥有 ${MAX_PETS} 只宠物，请先放生一只`);
-    if (state.coins < HATCH_COST) return toast(`❌ 金币不足，需要 ${HATCH_COST} 金币`);
-    state.coins -= HATCH_COST;
-    const e = { type: pickPet().id, level: 1, pet: freshPet(70), equipped: emptyGear() };
-    const name = PET_TYPES.find(t => t.id === e.type).name, stored = state.petLevel > 0;
+  adopt() {
+  if (state.coins < HATCH_COST) return toast(`❌ 金币不足，需要 ${HATCH_COST} 金币`);
+  state.coins -= HATCH_COST;
+  const e = { type: pickPet().id, level: 1, pet: freshPet(70), equipped: emptyGear() };
+  const name = PET_TYPES.find(t => t.id === e.type).name;
+  
+  if (petCount() >= MAX_PETS) {
+    if (!state.warehouse) state.warehouse = [];
+    state.warehouse.push(e);
+    render(); 
+    toast(`🎉 咔嚓！你孵出了「${name}」！因为收纳箱满了，已放进仓库`);
+  } else {
+    const stored = state.petLevel > 0;
     if (stored) state.box.push(e); else loadEntry(e);
-    render(); toast(`🎉 咔嚓！你孵出了「${name}」！${stored ? '已放进收纳箱' : ''}`);
-  },
-  swapPet({ id }) {                                        // 收纳箱里的宠物出战，当前出战的收起来
-    const i = +id, target = state.box[i];
-    if (!target) return;
-    const cur = state.petLevel > 0 ? activeAsEntry() : null;
-    loadEntry(target);
-    if (cur) state.box[i] = cur; else state.box.splice(i, 1);
-    render(); toast(`✅ 「${petType().name}」出战！`);
-  },
+    render(); 
+    toast(`🎉 咔嚓！你孵出了「${name}」！${stored ? '已放进收纳箱' : ''}`);
+  }
+},
+
+swapWarehouse({ id }) {
+  const i = +id;
+  const target = state.warehouse[i];
+  if (!target) return;
+  if (petCount() >= MAX_PETS) return toast(`❌ 收纳箱已满（最多 6 只）。请先放生一只收纳箱里的宠物。`);
+  state.warehouse.splice(i, 1);
+  state.box.push(target);
+  render(); 
+  toast(`✅ 已把「${PET_TYPES.find(t => t.id === target.type).name}」调出到收纳箱`);
+},
   storePet() {                                             // 把出战的宠物收起来
     if (state.petLevel < 1) return;
     state.box.push(activeAsEntry()); emptyActive();
@@ -1656,7 +1689,7 @@ function fillSkills(type, lv) {                             // 按“这场对�
   if (!area) return;
   type = type || state.petType; lv = lv || state.petLevel || 1;
   const all = Auth.skills().filter(x => x.type === type);
-  const open = all.filter(x => x.unlock <= lv), locked = all.filter(x => x.unlock > lv);
+  const open = all.filter(x => x.unlock <= lv).slice(0, 4), locked = all.filter(x => x.unlock > lv);
   area.replaceChildren();
   if (!all.length) return area.append(el('div', { className: 'hint', textContent: '这只宠物的技能表还没有建好（需要先运行 schema16.sql）。' }));
   area.append(el('div', { className: 'skill-grid' }, ...open.map(skillBtn)));
