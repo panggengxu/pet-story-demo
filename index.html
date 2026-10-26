@@ -5,6 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PETS STORY (Pro Demo)</title>
 <style>
+/* 美化背包滚动条 */
+#inventory-container::-webkit-scrollbar {
+  width: 6px;
+}
+#inventory-container::-webkit-scrollbar-track {
+  background: var(--soft);
+  border-radius: 10px;
+}
+#inventory-container::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 10px;
+}
+#inventory-container::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
 :root{--bg:#f4f7fe;--card:#fff;--primary:#4318ff;--accent:#ffb800;--text:#2b3674;--muted:#a3aed0;--border:#e9edf7;--ok:#05cd99;--soft:#f8f9fc}
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,sans-serif}
 body{background:var(--bg);color:var(--text);padding:16px}
@@ -272,19 +287,75 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
     <div class="card">
       <div class="card-title">PET SHOP & GACHA</div>
       <div class="card-heading">神秘宠物盲盒与奖励预览 🎁</div>
-      <div style="border:1px solid var(--border);border-radius:12px;padding:15px;text-align:center;background:var(--soft);max-width:340px;margin-bottom:20px">
-        <div style="font-size:2.5rem">🎁</div>
-        <div style="font-weight:bold;margin:6px 0">神秘宠物盲盒</div>
-        <div class="hint" style="margin-bottom:10px">每次抽取消耗 <span id="gacha-cost"></span>🪙</div>
-        <div style="display:flex;gap:8px">
-          <button class="btn-action btn-gold" style="flex:1" data-action="preview">预览奖池 👀</button>
-          <button class="btn-action" style="flex:1" data-action="gacha">抽奖</button>
+      <!-- 👇 豪华版宠物盲盒 👇 -->
+      <div style="border:2px dashed var(--primary); border-radius:16px; padding:30px 20px; text-align:center; background:#f8f7ff; position:relative; display:flex; flex-direction:column; justify-content:center; align-items:center; max-width:380px; margin-bottom:24px;">
+        <!-- 顶部悬浮标签 -->
+        <div style="position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:var(--primary); color:#fff; font-size:.75rem; font-weight:bold; padding:2px 10px; border-radius:10px; white-space:nowrap; box-shadow:0 2px 6px rgba(67,24,255,0.3)">极品装备掉落</div>
+        
+        <!-- 图标（加上了浮动动画） -->
+        <div style="font-size:3.5rem; margin-bottom:10px; animation: arenaIdle 2s infinite; filter: drop-shadow(0 4px 8px rgba(67,24,255,0.2))">🎁</div>
+        
+        <div style="font-weight:bold; font-size:1.2rem; color:var(--primary); margin-bottom:8px">神秘宠物盲盒</div>
+        <div class="hint" style="margin-bottom:24px">每次抽取消耗 <b><span id="gacha-cost"></span></b>🪙</div>
+        
+        <!-- 按钮区 -->
+        <div style="width:100%; max-width:280px; display:flex; gap:10px;">
+          <button class="btn-action btn-block" style="background:#fff; border:1px solid var(--border); color:var(--text); flex:1" data-action="preview">预览奖池 👀</button>
+          <button class="btn-action btn-block" style="background:var(--primary); color:#fff; box-shadow:0 4px 10px rgba(67,24,255,0.3); flex:1" data-action="gacha">立即抽奖</button>
+        </div>
+        
+        <!-- 底部诱惑标签 -->
+        <div class="hint" style="margin-top:24px; font-size:.75rem; color:var(--primary); background:#eeeaff; padding:4px 12px; border-radius:20px">
+          ⚔️ 传说核心 +60 战力等你拿！
         </div>
       </div>
       <div class="card-title">MY INVENTORY（我的背包）</div>
       <div class="hint" style="margin-bottom:10px">点击装备下方的“穿戴”，即可装到宠物身上。带 🔁 的是重复装备，可以分解换金币。</div>
       <button class="btn-action btn-gold" data-action="sellDup" style="margin-bottom:10px">♻️ 一键分解重复装备</button>
-      <div id="inventory-container" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+      <div id="inventory-container" style="display:flex;flex-wrap:wrap;gap:10px; max-height: 380px; overflow-y: auto; padding-right: 5px;"></div>
+
+      <!-- 👇 新增文具盲盒与商店（彻底分离版） -->
+      <div class="card-title" style="margin-top:24px">STATIONERY SHOP & GACHA</div>
+      
+      <!-- 使用网格布局，电脑上左右并排，手机上一上一下 -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:16px">
+        
+        <!-- 🎁 左侧：文具盲盒（黄色虚线框+浅黄背景） -->
+        <div style="border:2px dashed var(--accent); border-radius:16px; padding:30px 20px; text-align:center; background:#fffdf5; position:relative; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+          <div style="position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:var(--accent); color:#000; font-size:.75rem; font-weight:bold; padding:2px 10px; border-radius:10px; white-space:nowrap">限时抽奖玩法</div>
+          
+          <div style="font-size:3.5rem; margin-bottom:10px; animation: arenaIdle 2s infinite">📦</div>
+          <div style="font-weight:bold; font-size:1.2rem; color:var(--text); margin-bottom:8px">神秘文具盲盒</div>
+          <div class="hint" style="margin-bottom:24px">每次消耗 <b>40</b>🪙，抽中实物找老师领</div>
+          
+          <div style="width:100%; max-width:240px;">
+            <button class="btn-action btn-gold btn-block" style="margin-bottom:10px; padding:12px; font-size:1rem; box-shadow:0 4px 10px rgba(255,184,0,0.3);" data-action="gachaStationery">立即抽盲盒</button>
+            <button class="btn-action btn-block" style="background:#fff; border:1px solid var(--border); color:var(--text)" data-action="previewStationery">👀 预览奖池概率</button>
+          </div>
+          
+          <div class="hint" style="margin-top:24px; font-size:.75rem; color:#d97706; background:#fef3c7; padding:4px 12px; border-radius:20px">
+            🎁 最高可抽中 150🪙 的限定大奖！
+          </div>
+        </div>
+
+        <!-- 🛒 右侧：文具商店（灰色实线框+浅灰背景） -->
+        <div style="border:1px solid var(--border); border-radius:16px; padding:20px; background:var(--soft)">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px">
+            <div style="font-weight:bold; font-size:1.1rem; color:var(--primary)">🛒 文具直购商店</div>
+            <div class="hint">金币直接兑换</div>
+          </div>
+          <!-- 商店商品列表容器 -->
+          <div id="stationery-shop-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); gap:12px; align-content:flex-start"></div>
+        </div>
+
+      </div>
+      <!-- 👆 分离版结束 -->
+
+      <!-- 👇 我的文具记录 -->
+      <div class="card-title" style="margin-top:16px">MY REDEMPTIONS（我的文具领取记录）</div>
+      <div id="my-stationery-orders" style="background:var(--soft); padding:10px; border-radius:10px; max-height:200px; overflow-y:auto;">
+        <div class="hint" style="text-align:center">加载中...</div>
+      </div>
     </div>
   </div>
 
@@ -697,7 +768,7 @@ const closeModals = () => document.querySelectorAll('.modal-overlay').forEach(m 
 function render() {
   $('coins').textContent = state.coins;
   $('stars').textContent = state.stars;
-  renderPet(); renderPetBox(); renderWarehouse(); renderCare(); renderRank(); renderDuels();  renderMessages(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic();
+  renderPet(); renderPetBox(); renderWarehouse(); renderCare(); renderRank(); renderDuels();  renderMessages(); renderNotices(); renderHall(); renderSubs(); renderSlots(); renderInventory(); renderMusic(); renderStationery();
   save();
 }
 const gearPower = it => it ? (POOL.find(p => p.name === it.name)?.power ?? 0) : 0;
@@ -1201,6 +1272,58 @@ async function renderRankingList() {
   }
 }
 
+// ===== 文具商店与盲盒系统 =====
+async function renderStationery() {
+  try {
+    // 1. 获取商品库存
+    const { data: items, error: err1 } = await Auth.sb.from('stationery_stock').select('*');
+    if (err1) throw err1;
+    
+    // 2. 渲染商店列表
+    const shopBox = $('stationery-shop-list');
+    if (shopBox) {
+      const shopItems = items.filter(i => i.shop_price > 0);
+      shopBox.replaceChildren(...shopItems.map(it => {
+        const canBuy = it.active && it.stock > 0;
+        const btnText = !it.active ? '已下架' : (it.stock <= 0 ? '已售罄' : `购买 ${it.shop_price}🪙`);
+        return el('div', { className: 'inv-item' },
+          el('div', { textContent: it.icon, style: 'font-size:1.8rem' }),
+          el('div', { textContent: it.name, style: 'font-size:.8rem;font-weight:bold;margin:4px 0' }),
+          el('div', { className: 'hint', textContent: `库存: ${it.stock}` }),
+          btn(btnText, 'buyStationery', { id: it.id }, canBuy ? 'btn-action btn-block' : 'btn-action btn-block', { disabled: !canBuy })
+        );
+      }));
+    }
+
+    // 3. 获取我的兑换记录
+    const { data: orders, error: err2 } = await Auth.sb.from('stationery_orders')
+      .select('*').order('created_at', { ascending: false }).limit(20);
+    if (err2) throw err2;
+    
+    const orderBox = $('my-stationery-orders');
+    if (orderBox) {
+      if (!orders.length) {
+        orderBox.replaceChildren(el('div', { className: 'hint', textContent: '还没有记录，快去抽盲盒或购买吧！' }));
+      } else {
+        orderBox.replaceChildren(...orders.map(r => {
+          let tagText = '⏳ 待发货', tagClass = 'tag-pending';
+          if (r.status === 'claimed') { tagText = '✅ 已发货'; tagClass = 'tag-claimed'; }
+          if (r.status === 'refunded') { tagText = '↩️ 已退款'; tagClass = 'tag-refunded'; }
+          return el('div', { className: 'rank-item', style: 'padding:6px 0; border-bottom:1px dashed #ddd' },
+            el('div', {},
+              el('div', { textContent: `${r.item_icon} ${r.item_name}（${r.source === 'gacha' ? '盲盒' : '直购'}）` }),
+              el('div', { className: 'hint', style: 'font-size:.7rem' }, `${new Date(r.created_at).toLocaleString()}`)
+            ),
+            el('span', { className: `tag ${tagClass}`, style: `font-size:.7rem;padding:2px 8px;border-radius:6px;${r.status==='pending'?'background:#fff7e6;color:#b26a00':r.status==='claimed'?'background:#e6faf5;color:#05a37a':'background:#fee2e2;color:#b91c1c'}` }, tagText)
+          );
+        }));
+      }
+    }
+  } catch (e) {
+    console.error('加载文具数据失败', e);
+  }
+}
+
 const ACTIONS = {
     setRankScope({ scope }) { currentRankScope = scope; renderRankingList(); },
   setRankMetric({ metric }) { currentRankMetric = metric; renderRankingList(); },
@@ -1531,6 +1654,117 @@ toWarehouse({ id }) {
       el('span', { textContent: `${Math.round(i.weight / total * 100)}%`, style: 'color:var(--primary);font-weight:bold' }))));
     openModal('preview-modal');
   },
+
+    async buyStationery({ id }) {
+    if (state.coins < 20) return toast('❌ 金币可能不足');
+    
+    // 查最新库存
+    const { data: item } = await Auth.sb.from('stationery_stock').select('*').eq('id', id).single();
+    if (!item || !item.active || item.stock <= 0) return toast('❌ 该商品已售罄或下架');
+    if (state.coins < item.shop_price) return toast(`❌ 金币不足，需要 ${item.shop_price} 金币`);
+
+    // 👇 更新：使用乐观锁扣库存，并判断是否真的扣除了
+    const { data: updated, error: errStock } = await Auth.sb.from('stationery_stock')
+      .update({ stock: item.stock - 1 })
+      .eq('id', id)
+      .eq('stock', item.stock)
+      .select(); // 必须加 select() 才能拿到更新后的数据
+
+    if (errStock || !updated || updated.length === 0) {
+      return toast('❌ 购买失败：手慢了，库存刚刚被别人抢空了！');
+    }
+
+    // 记订单
+    const { data: { user } } = await Auth.sb.auth.getUser();
+    await Auth.sb.from('stationery_orders').insert({
+      student_id: user.id, item_id: item.id, item_name: item.name, item_icon: item.icon, source: 'shop', cost: item.shop_price
+    });
+
+    // 扣钱并保存
+    state.coins -= item.shop_price;
+    save(); pushSave(true); 
+    render();
+    toast(`✅ 购买成功！请找老师领取【${item.name}】`);
+  },
+
+  async previewStationery() {
+    try {
+      // 拉取所有参与盲盒且未下架的奖品
+      const { data: items } = await Auth.sb.from('stationery_stock').select('*').gt('gacha_weight', 0).eq('active', true);
+      if (!items || !items.length) return toast('❌ 盲盒暂未开放');
+
+      const totalWeight = items.reduce((s, i) => s + i.gacha_weight, 0);
+      const list = $('preview-list'); // 复用原有的弹窗列表容器
+      
+      list.replaceChildren(...items.map(i => {
+        const prob = Math.round((i.gacha_weight / totalWeight) * 100);
+        // 如果当前库存为 0，告诉学生抽中只有安慰奖
+        const stockHint = i.stock <= 0 ? ' (缺货，抽中退15🪙)' : '';
+        
+        return el('div', { className: 'pool-item' },
+          el('span', { textContent: `${i.icon} ${i.name}` }),
+          el('span', { 
+            textContent: `${prob}%${stockHint}`, 
+            style: `color:var(--primary);font-weight:bold; ${i.stock <= 0 ? 'opacity:0.5' : ''}` 
+          })
+        );
+      }));
+      
+      openModal('preview-modal'); // 打开原有的预览弹窗
+    } catch (e) {
+      console.error(e);
+      toast('❌ 加载奖池失败');
+    }
+  },
+
+  async gachaStationery() {
+    const GACHA_PRICE = 40;
+    if (state.coins < GACHA_PRICE) return toast(`❌ 金币不足，需要 ${GACHA_PRICE} 金币`);
+
+    // 获取所有参与盲盒的奖品
+    const { data: items } = await Auth.sb.from('stationery_stock').select('*').gt('gacha_weight', 0).eq('active', true);
+    if (!items || !items.length) return toast('❌ 盲盒暂未开放');
+
+    // 🎯 方案 A：固定权重抽奖（从所有参与盲盒的奖品里按权重抽）
+    const totalWeight = items.reduce((s, i) => s + i.gacha_weight, 0);
+    let r = Math.random() * totalWeight;
+    const prize = items.find(i => (r -= i.gacha_weight) < 0) || items[0];
+
+    // 扣钱
+    state.coins -= GACHA_PRICE;
+    
+    // 检查库存
+    if (prize.stock <= 0) {
+      state.coins += 15; // 退回 15 金币作为安慰
+      save(); pushSave(true); render();
+      return toast(`🎁 抽中了【${prize.name}】，但刚好没货了。已退还 15🪙 安慰奖给你。`);
+    }
+
+    // 👇 更新：使用乐观锁扣库存
+    const { data: updated, error: errStock } = await Auth.sb.from('stationery_stock')
+      .update({ stock: prize.stock - 1 })
+      .eq('id', prize.id)
+      .eq('stock', prize.stock)
+      .select();
+
+    if (errStock || !updated || updated.length === 0) {
+      state.coins += 15; // 别人抢走了，退款
+      save(); pushSave(true); render();
+      return toast(`🎁 抽中了【${prize.name}】，但手慢了被抢空了。已退还 15🪙 安慰奖给你。`);
+    }
+
+    // 记订单
+    const { data: { user } } = await Auth.sb.auth.getUser();
+    await Auth.sb.from('stationery_orders').insert({
+      student_id: user.id, item_id: prize.id, item_name: prize.name, item_icon: prize.icon, source: 'gacha', cost: GACHA_PRICE
+    });
+
+    save(); pushSave(true); render();
+    $('gacha-reward-icon').textContent = prize.icon;
+    $('gacha-reward-name').textContent = `恭喜抽中：${prize.name}（请找老师领取实物）`;
+    openModal('gacha-modal');
+  },
+
   gacha() {
     if (state.coins < GACHA_COST) return toast(`❌ 金币不足，需要 ${GACHA_COST} 金币`);
     state.coins -= GACHA_COST;

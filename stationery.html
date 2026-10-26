@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文具管理 · Pets Story</title>
+<style>
+:root{--bg:#f4f7fe;--primary:#4318ff;--accent:#ffb800;--text:#2b3674;--muted:#a3aed0;--border:#e9edf7;--soft:#f8f9fc;--ok:#05cd99}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,sans-serif}
+body{background:var(--bg);color:var(--text);padding:16px}
+.wrap{max-width:1100px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:#fff;padding:14px 20px;border-radius:16px;margin-bottom:16px}
+.brand{font-weight:bold;color:var(--primary)}
+.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,.03)}
+h2{font-size:1.05rem;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+label{font-size:.75rem;font-weight:700;display:flex;flex-direction:column;gap:4px}
+select,input{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:.9rem}
+.b{background:var(--primary);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.8rem}
+.b.gold{background:var(--accent);color:#000}
+.b.ghost{background:var(--bg);color:var(--text)}
+.b.red{background:#fde8e8;color:#c22}
+.b:disabled{opacity:0.5;cursor:not-allowed}
+table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:640px;margin-top:10px}
+th,td{padding:10px 8px;border-bottom:1px solid var(--border);text-align:left}
+th{color:var(--muted);font-size:.75rem}
+.empty{color:var(--muted);padding:20px 0;text-align:center}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 18px;border-radius:10px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;z-index:999}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">🖊️ 文具盲盒与商店 · 后台管理</div>
+    <div class="row">
+      <a href="teacher.html" class="b ghost" style="text-decoration:none">返回主后台</a>
+      <button class="b" data-a="logout">退出</button>
+    </div>
+  </header>
+
+  <section class="card">
+    <h2>📦 统一库存与上架管理 <span style="font-size:.8rem;color:var(--muted);font-weight:normal">（盲盒与商店共享库存）</span></h2>
+        <div style="margin-bottom:10px">
+      <button class="b ghost" onclick="renderData()">🔄 刷新实时数据</button>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>商品名称</th>
+            <th>盲盒权重</th>
+            <th>商店直售价格</th>
+            <th>当前库存</th>
+            <th>状态操作</th>
+          </tr>
+        </thead>
+        <tbody id="t-stock-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>⏳ 待发货订单</h2>
+    <div class="hint" style="margin-bottom:12px;color:var(--muted);font-size:.85rem">只显示当前筛选班级的学生订单。如果缺货，可以点“退款”直接把金币退回给学生。</div>
+    <div id="t-order-list"></div>
+  </section>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.100.1/dist/umd/supabase.js"></script>
+<script src="shared.js"></script>
+<script>
+const me = Auth.guard('teacher');
+if (!me) throw new Error('未登录');
+
+const $ = id => document.getElementById(id);
+const el = (t, p = {}, ...k) => { const n = Object.assign(document.createElement(t), p); n.append(...k); return n; };
+let tt; const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2200); };
+const btn = (text, a, id, cls = 'b') => { const b = el('button', { className: cls, textContent: text }); b.dataset.a = a; if (id) b.dataset.id = id; return b; };
+
+let curClass = '';
+const myUser = () => Auth.users().find(u => u.id === me.id) || me;
+const myClasses = () => { const u = myUser(), all = Auth.classes(); return u.admin ? all : all.filter(c => (u.classIds || []).includes(c.id)); };
+
+function renderClassSelect() {
+  const cs = myClasses(), sel = $('cls');
+  if (!cs.some(c => c.id === curClass)) curClass = cs[0]?.id || '';
+  sel.replaceChildren(...(cs.length ? cs.map(c => new Option(c.name, c.id)) : [new Option('（暂无班级）', '')]));
+  sel.value = curClass;
+}
+
+async function renderData() {
+  try {
+    // 1. 渲染库存（和原来一样，不用改）
+    const { data: items } = await Auth.sb.from('stationery_stock').select('*').order('id');
+    if (items) {
+      $('t-stock-rows').replaceChildren(...items.map(it => {
+        return el('tr', {},
+          el('td', {}, el('b', { textContent: `${it.icon || '🎁'} ${it.name}` })),
+          el('td', { textContent: it.gacha_weight > 0 ? `${it.gacha_weight}%` : '不参与' }),
+          el('td', { textContent: it.shop_price > 0 ? `${it.shop_price}🪙` : '不直售' }),
+          el('td', {}, el('input', { 
+            type: 'number', value: it.stock, min: 0, 
+            style: 'width:70px; padding:4px', 
+            onchange: (e) => updateStock(it.id, e.target.value) 
+          })),
+          el('td', {}, btn(it.active ? '销售中 (点击下架)' : '已下架 (点击上架)', 'toggleStock', it.id, it.active ? 'b ghost' : 'b red'))
+        );
+      }));
+    }
+
+    // 2. 渲染待发货（取消班级限制，获取全校所有订单，按时间升序排 = 先到先得）
+    const { data: orders, error } = await Auth.sb.from('stationery_orders')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true }); // 👈 true 代表按时间从早到晚（谁先买谁在上面）
+      
+    if (error) throw error;
+
+    if (!orders || !orders.length) {
+      return $('t-order-list').replaceChildren(el('div', { className: 'empty', textContent: '全中心暂时没有待发货的文具 🎉' }));
+    }
+
+    $('t-order-list').replaceChildren(...orders.map(r => {
+      // 找到买文具的学生信息
+      const stu = Auth.users().find(u => u.uid === r.student_id);
+      // 找到学生所在的班级名称
+      const className = stu ? (Auth.classes().find(c => c.id === stu.classId)?.name || '未知班级') : '未知班级';
+      
+      return el('div', { style: 'border-top:1px dashed #ddd; padding:12px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px' },
+        el('div', {},
+          el('div', { style: 'font-weight:bold; font-size:.95rem' }, `${r.item_icon} ${r.item_name}`),
+          // 👇 显示学生的姓名和班级
+          el('div', { style: 'color:#888; font-size:.8rem; margin-top:4px' }, 
+            `买家：${stu ? stu.name : '未知'} (${className}) · ${r.source === 'gacha' ? '🎰 盲盒' : '🛒 直购'} · 花费 ${r.cost}🪙`
+          ),
+          el('div', { style: 'color:#aaa; font-size:.75rem; margin-top:2px' }, 
+            `下单时间：${new Date(r.created_at).toLocaleString()}`
+          )
+        ),
+        el('div', { style: 'display:flex; gap:8px' },
+          btn('✅ 标记发放', 'claimOrder', r.id, 'b gold'),
+          btn('❌ 缺货退款', 'refundOrder', r.id, 'b red')
+        )
+      );
+    }));
+  } catch (e) {
+    console.error('加载失败', e);
+  }
+}
+
+// 核心操作
+async function updateStock(id, val) {
+  const stock = Math.max(0, Number(val));
+  await Auth.sb.from('stationery_stock').update({ stock }).eq('id', id);
+  toast('库存已更新');
+  renderData();
+}
+
+const A = {
+  logout: Auth.logout,
+  async toggleStock(id) {
+    const { data: it } = await Auth.sb.from('stationery_stock').select('active').eq('id', id).single();
+    if (it) await Auth.sb.from('stationery_stock').update({ active: !it.active }).eq('id', id);
+    toast(it.active ? '🚫 已下架' : '✅ 已上架');
+    renderData();
+  },
+  async claimOrder(id) {
+    await Auth.sb.from('stationery_orders').update({ status: 'claimed', claimed_at: new Date().toISOString(), claimed_by: me.name }).eq('id', id);
+    toast('✅ 已标记为已发货');
+    renderData();
+  },
+  async refundOrder(id) {
+    if (!confirm('确认该商品缺货，需要退款吗？系统将自动退回金币给学生。')) return;
+    
+    // 查订单
+    const { data: r } = await Auth.sb.from('stationery_orders').select('*').eq('id', id).single();
+    if (!r) return;
+    
+    // 标记退款
+    await Auth.sb.from('stationery_orders').update({ status: 'refunded' }).eq('id', id);
+    
+    // 通过 awards 表退钱
+    await Auth.sb.from('awards').insert({
+      student_id: r.student_id, coins: r.cost, stars: 0, exp: 0, note: `文具缺货退款：${r.item_name}`
+    });
+    
+    toast('↩️ 已退款，金币会自动补发给学生');
+    renderData();
+  }
+};
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-a]');
+  if (t) A[t.dataset.a]?.(t.dataset.id);
+});
+
+
+Auth.ready.then(() => {
+  renderData();
+});
+</script>
+</body>
+</html>
