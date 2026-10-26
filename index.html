@@ -2359,30 +2359,46 @@ setInterval(() => { Auth.updateHeartbeat(); }, 60000);
   Auth.updateHeartbeat();
   setInterval(() => { if (!document.hidden) poll(); }, 30000);
   setInterval(() => { if (!document.hidden) notifyDuels(); }, 6000);
-  // 👇 优化：手机息屏或切后台时，自动暂停音乐
+  // 👇 优化：手机息屏或切后台时，彻底关闭音频并清理系统播放器
+  function stopAndClearAudio() {
+    if (!player) return;
+    if (!player.paused) {
+      window.wasPlayingBeforeHidden = true; // 记住之前是在播放的
+    }
+    player.pause();
+    // 核心魔法：清空源并重新加载，强行让手机系统的音乐控制器消失
+    player.removeAttribute('src'); 
+    player.src = ''; 
+    player.load(); 
+  }
+
   document.addEventListener('visibilitychange', () => { 
     if (document.hidden) { 
-      // 页面隐藏（息屏、切App、切标签页）
+      // 页面隐藏（息屏、切App）
       if (synced) pushSave(true); 
-      if (player && !player.paused) {
-        player.pause();
-        window.wasPlayingBeforeHidden = true; // 记住之前是在播放的
-      }
+      stopAndClearAudio();
     } else { 
       // 页面重新可见
       Auth.updateHeartbeat(); 
       poll(); 
-      // 如果之前是在播放的，并且现在没有被静音，就恢复播放
-      if (window.wasPlayingBeforeHidden && player && !player.muted) {
-        player.play().catch(() => {});
+      
+      // 如果之前是在播放的，且没静音，就重新获取音乐并播放
+      if (window.wasPlayingBeforeHidden && !player.muted) {
         window.wasPlayingBeforeHidden = false;
+        // 判断一下是不是在对战界面，如果在就播战斗曲，不在就播大厅曲
+        const isDuelModal = document.getElementById('duel-modal')?.classList.contains('open');
+        if (isDuelModal) {
+          playFightBgm();
+        } else {
+          playHomeBgm();
+        }
       }
     } 
   });
 
-  // 直接退出网页或者刷新时，确保声音关闭
+  // 直接退出网页或者刷新时，同样清空音频，防止卡片残留
   window.addEventListener('pagehide', () => { 
-    if (player) player.pause(); 
+    stopAndClearAudio(); 
     if (synced) pushSave(true); 
   });
 }).catch(() => {});
