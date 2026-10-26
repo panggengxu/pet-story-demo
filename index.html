@@ -52,6 +52,12 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .bar>i{display:block;height:100%;background:linear-gradient(90deg,#ff9a9e,#fad0c4);transition:width .3s}
 .pet-act{display:flex;gap:6px}.pet-act .btn-action{flex:1}
 .power{font-weight:700;color:var(--primary)}
+/* ===== 技能区 ===== */
+.skill-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:220px;overflow-y:auto;padding:2px}
+.skill-meta{font-size:.68rem;opacity:.85;margin-top:2px;font-weight:400}
+.skill-locked{margin-top:8px}
+.skill-chip{display:inline-block;background:#eee;color:#777;border-radius:10px;padding:2px 8px;margin:2px 4px 2px 0;font-size:.74rem}
+.arena-num.heal{color:#16a34a;font-size:1.3rem}
 /* ===== 对战舞台 ===== */
 .arena{position:relative;height:190px;border-radius:14px;overflow:hidden;background:linear-gradient(#bfe3ff 0%,#e9d5ff 62%);}
 .arena::after{content:'';position:absolute;left:0;right:0;bottom:0;height:30%;background:linear-gradient(#b7e4a8,#8ccf86);}
@@ -1626,11 +1632,26 @@ async function triggerDuelFriend({ id }) {
 // 进入对战房间（无论是发起方还是被挑战方）
 // 技能按钮：用 data-action / data-skill，由全局点击监听调用 ACTIONS.useSkill
 // （注意：el() 里写 onclick: 'useSkill(1)' 是无效的——DOM 的 onclick 属性只接受函数，字符串会被丢掉）
-function skillBtn(n, name, desc) {
-  const b = el('button', { className: 'skill-btn', type: 'button' }, name, el('div', { className: 'skill-desc', textContent: desc }));
+function skillBtn(sk) {                                     // sk = 技能表里的一行
+  const b = el('button', { className: 'skill-btn', type: 'button' }, `${sk.emoji} ${sk.name}`,
+    el('div', { className: 'skill-desc', textContent: sk.desc + (sk.heal ? `（吸血 ${Math.round(sk.heal * 100)}%）` : '') }),
+    el('div', { className: 'skill-meta', textContent: `命中 ${sk.hit}% · 伤害 ×${sk.mult}` }));
   b.dataset.action = 'useSkill';
-  b.dataset.skill = String(n);
+  b.dataset.skill = String(sk.code);
   return b;
+}
+function fillSkills(type, lv) {                             // 按“这场对战开始时记下的品种和等级”显示技能
+  const area = $('skill-area');
+  if (!area) return;
+  type = type || state.petType; lv = lv || state.petLevel || 1;
+  const all = Auth.skills().filter(x => x.type === type);
+  const open = all.filter(x => x.unlock <= lv), locked = all.filter(x => x.unlock > lv);
+  area.replaceChildren();
+  if (!all.length) return area.append(el('div', { className: 'hint', textContent: '这只宠物的技能表还没有建好（需要先运行 schema16.sql）。' }));
+  area.append(el('div', { className: 'skill-grid' }, ...open.map(skillBtn)));
+  if (locked.length) area.append(el('div', { className: 'skill-locked' },
+    el('div', { className: 'hint', textContent: `🔒 还有 ${locked.length} 个技能没解锁（升级、进化后解锁）：` }),
+    ...locked.map(x => el('span', { className: 'skill-chip', textContent: `Lv.${x.unlock} ${x.emoji} ${x.name}` }))));
 }
 
 // ===== 对战舞台：两只宠物面对面，出招时冲过去、特效飞过去、对方抖动变红、头上飘伤害数字 =====
@@ -1651,16 +1672,20 @@ function buildArena() {
 function arenaPlay(l, mine) {                               // 演出一招
   const atk = $(mine ? 'arena-me' : 'arena-opp'), def = $(mine ? 'arena-opp' : 'arena-me'), fx = $('arena-fx');
   if (!atk || !def || !fx) return;
-  const miss = !(l.dmg > 0), skill = l.skill || 1, lunge = mine ? 'lunge-r' : 'lunge-l';
+  const sk = Auth.skillByCode(l.skill), miss = !(l.dmg > 0), lunge = mine ? 'lunge-r' : 'lunge-l';
   atk.classList.add(lunge);
   atk.addEventListener('animationend', () => atk.classList.remove(lunge), { once: true });
-  const bolt = el('span', { className: 'arena-fx ' + (mine ? 'fly-r' : 'fly-l'), textContent: ['💥', '🔥', '⚡'][skill - 1] || '💥' });
+  const bolt = el('span', { className: 'arena-fx ' + (mine ? 'fly-r' : 'fly-l'), textContent: (sk && sk.emoji) || '💥' });
   fx.append(bolt); setTimeout(() => bolt.remove(), 600);
   setTimeout(() => {                                         // 特效到达后：命中抖动变红 / 闪避
     if (!miss) { def.classList.add('hit'); setTimeout(() => def.classList.remove('hit'), 520); }
-    const num = el('div', { className: 'arena-num ' + (mine ? 'on-right' : 'on-left') + (miss ? ' miss' : skill === 3 ? ' crit' : ''),
+    const num = el('div', { className: 'arena-num ' + (mine ? 'on-right' : 'on-left') + (miss ? ' miss' : (sk && sk.mult >= 2.5) ? ' crit' : ''),
       textContent: miss ? 'MISS' : '-' + Math.round(l.dmg) });
     fx.append(num); setTimeout(() => num.remove(), 1000);
+    if (l.heal > 0) {                                        // 吸血：出招方头上飘绿色 +N
+      const h = el('div', { className: 'arena-num heal ' + (mine ? 'on-left' : 'on-right'), textContent: '+' + l.heal });
+      h.style.top = '4%'; fx.append(h); setTimeout(() => h.remove(), 1000);
+    }
   }, 380);
 }
 function arenaUpdate(d, isChallenger, myUid, logs, myHp, oppHp, oppName, oppUid) {
@@ -1671,6 +1696,7 @@ function arenaUpdate(d, isChallenger, myUid, logs, myHp, oppHp, oppName, oppUid)
     const type = isChallenger ? d.b_pet : d.a_pet, level = Auth.friends().find(f => f.otherId === oppUid)?.petLevel || 1;
     if (type) opp.querySelector('.arena-pet').src = petImageOf({ type, level });
     opp.querySelector('.arena-name').textContent = oppName;
+    fillSkills(isChallenger ? d.a_pet : d.b_pet, isChallenger ? d.a_lv : d.b_lv);   // 按这场对战开始时记下的品种和等级显示技能
   }
   if (arenaLast < 0) arenaLast = logs.length;                // 刚进来：只显示当前状态，不重播以前的招式
   else if (logs.length > arenaLast) {
@@ -1696,11 +1722,7 @@ function openDuelRoom(duelId, isDefender = false) {
     el('div', { id: 'duel-log', style: 'height:120px;overflow-y:auto;background:var(--soft);padding:8px;border-radius:8px;font-size:.85rem;margin-top:12px;line-height:1.5' },
       el('div', { textContent: '正在连接对战服务器...' })
     ),
-    el('div', { id: 'skill-area', style: 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px;display:none' },
-      skillBtn(1, '普通攻击', '稳定输出'),
-      skillBtn(2, '强力猛击', '高伤 · 20% Miss'),
-      skillBtn(3, '终极必杀', '极高伤 · 50% Miss')
-    )
+    el('div', { id: 'skill-area', style: 'margin-top:12px;display:none' })
   );
   openModal('duel-modal');
   
@@ -1751,9 +1773,9 @@ async function pollDuelState(duelId) {
     const logs = d.rounds || [];
     $('duel-log').replaceChildren(...logs.map(l => {
       const isMyAttack = l.who === myUid;
-      const skillName = ['普通攻击','强力猛击','终极必杀'][l.skill - 1];
+      const sk = Auth.skillByCode(l.skill), skillName = sk ? sk.emoji + ' ' + sk.name : '技能';
       return el('div', { style: isMyAttack ? 'color:var(--primary);margin-bottom:4px' : 'color:#d33;margin-bottom:4px' }, 
-        `${isMyAttack ? '👉 你' : '🔥 对方'}使用了【${skillName}】[cite: 16]，${l.dmg > 0 ? `造成 ${Math.round(l.dmg)} 点伤害！` : '被闪避了！'}`);
+        `${isMyAttack ? '👉 你' : '🔥 对方'}使用了【${skillName}】[cite: 16]，${l.dmg > 0 ? `造成 ${Math.round(l.dmg)} 点伤害！` : '被闪避了！'}${l.heal > 0 ? ` 并恢复了 ${l.heal} 点血量。` : ''}`);
     }));
     if(logs.length) $('duel-log').scrollTop = $('duel-log').scrollHeight;
     
@@ -1779,11 +1801,11 @@ async function pollDuelState(duelId) {
       clearInterval(duelInterval);
     } else if (isMyTurn) {
       skillArea.style.display = 'grid';
-      Array.from(skillArea.children).forEach(b => b.disabled = false);
+      skillArea.querySelectorAll('.skill-btn').forEach(b => b.disabled = false);
       $('duel-title').textContent = '🎯 轮到你出招了！';
     } else {
       skillArea.style.display = 'grid';
-      Array.from(skillArea.children).forEach(b => b.disabled = true);
+      skillArea.querySelectorAll('.skill-btn').forEach(b => b.disabled = true);
       $('duel-title').textContent = '⏳ 等待对方出招...';
     }
   } catch (e) { console.error(e); }
@@ -1792,13 +1814,13 @@ async function pollDuelState(duelId) {
 // 使用技能
 async function useSkill(skill) {
   const skillArea = $('skill-area');
-  Array.from(skillArea.children).forEach(b => b.disabled = true);
+  skillArea.querySelectorAll('.skill-btn').forEach(b => b.disabled = true);
   try {
     await Auth.duelAction(currentDuelId, skill);
     pollDuelState(currentDuelId); // 立刻刷新一次，不用等 1.5 秒
   } catch (e) {
     toast('❌ ' + e.message);
-    Array.from(skillArea.children).forEach(b => b.disabled = false);
+    skillArea.querySelectorAll('.skill-btn').forEach(b => b.disabled = false);
   }
 }
   
