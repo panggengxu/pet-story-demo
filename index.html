@@ -2359,8 +2359,32 @@ setInterval(() => { Auth.updateHeartbeat(); }, 60000);
   Auth.updateHeartbeat();
   setInterval(() => { if (!document.hidden) poll(); }, 30000);
   setInterval(() => { if (!document.hidden) notifyDuels(); }, 6000);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) { if (synced) pushSave(true); } else { Auth.updateHeartbeat(); poll(); } });
-  window.addEventListener('pagehide', () => { if (synced) pushSave(true); });
+  // 👇 优化：手机息屏或切后台时，自动暂停音乐
+  document.addEventListener('visibilitychange', () => { 
+    if (document.hidden) { 
+      // 页面隐藏（息屏、切App、切标签页）
+      if (synced) pushSave(true); 
+      if (player && !player.paused) {
+        player.pause();
+        window.wasPlayingBeforeHidden = true; // 记住之前是在播放的
+      }
+    } else { 
+      // 页面重新可见
+      Auth.updateHeartbeat(); 
+      poll(); 
+      // 如果之前是在播放的，并且现在没有被静音，就恢复播放
+      if (window.wasPlayingBeforeHidden && player && !player.muted) {
+        player.play().catch(() => {});
+        window.wasPlayingBeforeHidden = false;
+      }
+    } 
+  });
+
+  // 直接退出网页或者刷新时，确保声音关闭
+  window.addEventListener('pagehide', () => { 
+    if (player) player.pause(); 
+    if (synced) pushSave(true); 
+  });
 }).catch(() => {});
 
 </script>
