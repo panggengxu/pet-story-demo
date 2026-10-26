@@ -2551,7 +2551,7 @@ render();
         if (trade.status === 'accepted') {
           // ===== 对方同意了：发宠物 =====
           const { data: updated, error: err } = await Auth.sb.from('pet_trades')
-            .update({ status: 'finished' }).eq('id', trade.id).eq('status', 'accepted').select();
+            .update({ status: 'completed' }).eq('id', trade.id).eq('status', 'accepted').select();
           if (err) throw err;
           
           if (updated && updated.length > 0) {
