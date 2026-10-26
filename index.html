@@ -797,7 +797,7 @@ function renderPetBox() {                                  // 「我的宠物 n/
     el('div', { style: 'flex:1;min-width:0;font-size:.85rem' }, el('b', { textContent: (PET_TYPES.find(t => t.id === e.type) || PET_TYPES[0]).name }), el('div', { className: 'hint', textContent: note })),
     ...acts);
   if (state.petLevel > 0) list.append(row(activeAsEntry(), `出战中 · Lv.${state.petLevel}`, [btn('收起来', 'storePet', {}), btn('放生', 'releasePet', { id: 'active' }, 'unequip')]));
-  state.box.forEach((e, i) => list.append(row(e, `已收起 · Lv.${e.level}`, [btn('出战', 'swapPet', { id: i }), btn('放生', 'releasePet', { id: i }, 'unequip')])));
+  state.box.forEach((e, i) => list.append(row(e, `已收起 · Lv.${e.level}`, [btn('出战', 'swapPet', { id: i }), btn('存仓库', 'toWarehouse', { id: i }), btn('放生', 'releasePet', { id: i }, 'unequip')])));
   if (!total) list.append(el('div', { className: 'hint', textContent: '还没有宠物，先孵化一颗蛋吧！' }));
   if (total < MAX_PETS) list.append(el('div', { style: 'margin-top:8px' }, btn(`🥚 领养新宠物（${HATCH_COST}🪙）`, 'adopt', {}, 'btn-action btn-block')));
   else list.append(el('div', { className: 'hint', style: 'margin-top:8px', textContent: '宠物已满 6 只，想领养新的请先放生一只。' }));
@@ -1353,11 +1353,28 @@ swapWarehouse({ id }) {
   const i = +id;
   const target = state.warehouse[i];
   if (!target) return;
-  if (petCount() >= MAX_PETS) return toast(`❌ 收纳箱已满（最多 6 只）。请先放生一只收纳箱里的宠物。`);
+  
+  // 👇 如果满了，提示去收纳箱存仓库，而不是让人放生
+  if (petCount() >= MAX_PETS) {
+    return toast(`❌ 队伍已满。请先在【宠物管理】里点“存仓库”，把一只宠物放进仓库再来调出。`);
+  }
+  
   state.warehouse.splice(i, 1);
   state.box.push(target);
   render(); 
   toast(`✅ 已把「${PET_TYPES.find(t => t.id === target.type).name}」调出到收纳箱`);
+},
+
+// 👇 新增的动作：把收纳箱里的宠物存进仓库
+toWarehouse({ id }) {
+  const i = +id;
+  const target = state.box[i];
+  if (!target) return;
+  state.box.splice(i, 1); // 从收纳箱移除
+  if (!state.warehouse) state.warehouse = [];
+  state.warehouse.push(target); // 放进仓库
+  render(); 
+  toast(`✅ 已存入仓库，随时可以再调出`);
 },
   storePet() {                                             // 把出战的宠物收起来
     if (state.petLevel < 1) return;
