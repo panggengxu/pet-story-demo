@@ -9,6 +9,41 @@ const Auth = (() => {
   const SK = 'petsStory.session';
   const START = { coins: 500, stars: 10 };                            // 学生初始金币/星星（与 index.html 一致）
   const sb = supabase.createClient(SB_URL, SB_KEY);
+    // ===== 宠物交换系统 =====
+  // 发起交换
+  const inviteTrade = async (friendId, myPetData) => {
+    const { data, error } = await sb.from('pet_trades').insert({
+      challenger_id: (await sb.auth.getUser()).data.user.id,
+      defender_id: friendId,
+      challenger_pet: myPetData
+    }).select().single();
+    if (error) throw new Error(error.message);
+    return data;
+  };
+
+  // 获取我收到的交换请求（别人找我换）
+  const getPendingTrades = async () => {
+    const { data, error } = await sb.from('pet_trades')
+      .select('*').eq('defender_id', (await sb.auth.getUser()).data.user.id).eq('status', 'pending');
+    if (error) throw new Error(error.message);
+    return data;
+  };
+
+  // 响应交换请求 (同意或拒绝)
+  const respondTrade = async (tradeId, accept, myPetData = null) => {
+    const updates = { status: accept ? 'accepted' : 'rejected' };
+    if (accept) updates.defender_pet = myPetData;
+    const { error } = await sb.from('pet_trades').update(updates).eq('id', tradeId);
+    if (error) throw new Error(error.message);
+  };
+
+  // 结算我发起的交易（看看对方同意了没，同意了就把对方的宠物拿走）
+  const checkMyTrades = async () => {
+    const { data, error } = await sb.from('pet_trades')
+      .select('*').eq('challenger_id', (await sb.auth.getUser()).data.user.id).eq('status', 'accepted');
+    if (error) return [];
+    return data;
+  };
   const email = code => `${String(code).trim().toLowerCase()}@${DOMAIN}`;
 
   // ---- 缓存：登录后从 Supabase 读来，页面代码仍然可以同步读取 ----
@@ -345,5 +380,5 @@ const Auth = (() => {
   return { sb, refresh, loadDay, busy, call, promote, wall, postWall, delPost, friends, friendRequest, friendRespond, friendRemove, sendGiftCoins, sendGiftItem, claimGiftItems, duels, skills, skillByCode, inviteDuel, duelAction, duelForfeit, duelUpdateHP, updateHeartbeat, CHECKIN, CHECKIN_REWARD, hall, addHall, delHall, setHallPublic, addClass, delClass, moveStudent, setTeacherClass, changeMyPassword,
     users, classes, ready, session, login, logout, guard, START, SUBJECTS, KIND, saveKey,
     notices, saveNotices, topics, saveTopics, records, saveRecords, sub, setProof, delProof, proofUrl,
-    grant, claimAwards, pendingAward, loadSave, fetchMySave, pushMySave };
+    grant, claimAwards, pendingAward, loadSave, fetchMySave, pushMySave, inviteTrade, getPendingTrades, respondTrade, checkMyTrades };
 })();

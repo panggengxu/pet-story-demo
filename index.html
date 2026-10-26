@@ -318,7 +318,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
       <div class="card-title" style="margin-top:24px">STATIONERY SHOP & GACHA</div>
       
       <!-- 使用网格布局，电脑上左右并排，手机上一上一下 -->
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top: 16px; margin-bottom:16px">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:16px">
         
         <!-- 🎁 左侧：文具盲盒（黄色虚线框+浅黄背景） -->
         <div style="border:2px dashed var(--accent); border-radius:16px; padding:30px 20px; text-align:center; background:#fffdf5; position:relative; display:flex; flex-direction:column; justify-content:center; align-items:center;">
@@ -859,6 +859,7 @@ function renderRank() {                                    // 好友战力排行
           ),
           el('span', { style: 'display:flex;gap:4px' },
             btn('⚔️ 挑战', 'duelFriend', { id: f.otherId }),
+            btn('🔄 换宠', 'tradePet', { id: f.otherId }),
             btn('🎁 送礼', 'giftFriend', { id: f.otherId }),
             btn('删除', 'removeFriend', { id: f.id }, 'unequip')
           )
@@ -1324,9 +1325,134 @@ async function renderStationery() {
   }
 }
 
+let currentTradeId = null;
+
 const ACTIONS = {
     setRankScope({ scope }) { currentRankScope = scope; renderRankingList(); },
   setRankMetric({ metric }) { currentRankMetric = metric; renderRankingList(); },
+    // 【发起方】打开选宠界面
+  tradePet({ id }) {
+    const allMyPets = state.box.filter(p => !p.isActive);
+    if (!allMyPets.length) return toast('你的收纳箱为空，没有可交换的宠物！');
+    
+    const box = $('trade-my-pets');
+    box.replaceChildren();
+    state.tempTradeFriend = id; // 记下好友 UUID
+    state.tempTradePetIndex = undefined; // 重置选择
+    
+    allMyPets.forEach((p, index) => {
+      const pt = PET_TYPES.find(t => t.id === p.type) || PET_TYPES[0];
+      const btnEl = el('div', { 
+        style: 'border:2px solid transparent; border-radius:10px; padding:8px; background:var(--soft); text-align:center; cursor:pointer; width:80px',
+        onclick: (e) => {
+          box.querySelectorAll('div').forEach(d => d.style.borderColor = 'transparent');
+          btnEl.style.borderColor = 'var(--primary)';
+          state.tempTradePetIndex = index;
+        }
+      },
+        el('img', { src: petImageOf(p), style: 'width:50px; height:50px; object-fit:contain' }),
+        el('div', { style: 'font-size:.7rem; font-weight:bold; margin-top:4px' }, `${pt.name} Lv.${p.level}`)
+      );
+      box.append(btnEl);
+    });
+    openModal('trade-select-modal');
+  },
+
+  // 【发起方】确认发送请求
+  async confirmTradeSend() {
+    if (state.tempTradePetIndex === undefined) return toast('请先选择一只宠物');
+    const myPet = state.box[state.tempTradePetIndex];
+    if (!confirm(`确定要用【${PET_TYPES.find(t=>t.id===myPet.type).name}】发起交换吗？`)) return;
+    
+    try {
+      await Auth.inviteTrade(state.tempTradeFriend, myPet);
+      
+      // 发起成功后，立刻从本地移除这只宠物，防止重复发起
+      state.box.splice(state.tempTradePetIndex, 1); 
+      save(); pushSave(true); render();
+      closeModals();
+      toast('🚀 请求已发送，等待好友回应！');
+    } catch(e) {
+      toast('❌ 发起失败：' + e.message);
+    }
+  },
+    // 【接收方】同意交换
+  async confirmTradeReply() {
+    if (state.tempTradeReplyPetIndex === undefined) return toast('请先选择你要交出的宠物');
+    const myPet = state.box[state.tempTradeReplyPetIndex];
+    
+    try {
+      await Auth.respondTrade(currentTradeId, true, myPet);
+      
+      // 从你的箱子移除
+      state.box.splice(state.tempTradeReplyPetIndex, 1);
+      save(); pushSave(true); render();
+      closeModals();
+      toast('✅ 已同意交换！等待对方上线确认。');
+      currentTradeId = null;
+    } catch (e) {
+      toast('❌ 同意失败：' + e.message);
+    }
+  },
+
+  // 【接收方】拒绝交换
+  async rejectTradeReply() {
+    if (!currentTradeId) return;
+    try {
+      await Auth.respondTrade(currentTradeId, false);
+      closeModals();
+      toast('已拒绝该请求');
+      currentTradeId = null;
+    } catch (e) {
+      toast('❌ 操作失败：' + e.message);
+    }
+  },
+
+  // 【双方通用】飞行动画播放
+  playTradeAnimation(petA, petB) {
+    return new Promise(resolve => {
+      const layer = $('trade-anim-layer');
+      const petL = $('anim-pet-left');
+      const petR = $('anim-pet-right');
+      const flash = $('anim-flash');
+      const txt = $('anim-text');
+      
+      petL.src = petImageOf(petA);
+      petR.src = petImageOf(petB);
+      
+      petL.style.left = '0'; petL.style.transform = 'translateY(-50%)'; petL.style.opacity = '1';
+      petR.style.right = '0'; petR.style.transform = 'translateY(-50%)'; petR.style.opacity = '1';
+      flash.style.transform = 'translate(-50%, -50%) scale(0)'; flash.style.opacity = '0';
+      txt.style.opacity = '0';
+      layer.style.display = 'flex';
+      
+      // 1. 起飞相撞
+      setTimeout(() => {
+        petL.style.left = '40%'; petL.style.transform = 'translateY(-50%) rotate(20deg)';
+        petR.style.right = '40%'; petR.style.transform = 'translateY(-50%) rotate(-20deg)';
+      }, 100);
+      
+      // 2. 闪光爆炸
+      setTimeout(() => {
+        flash.style.transform = 'translate(-50%, -50%) scale(1.5)';
+        flash.style.opacity = '1';
+        petL.style.opacity = '0';
+        petR.style.opacity = '0';
+      }, 1100);
+      
+      // 3. 显示文字
+      setTimeout(() => {
+        flash.style.opacity = '0';
+        txt.style.opacity = '1';
+      }, 1500);
+      
+      // 4. 清理关闭
+      setTimeout(() => {
+        layer.style.display = 'none';
+        resolve();
+      }, 2800);
+    });
+  },
   inspectTeam({ id }) {
     let targetName = '';
     let targetPets = [];
@@ -2355,18 +2481,155 @@ render();
   document.addEventListener('click', unlockAudio);
   document.addEventListener('keydown', unlockAudio);
 
-setInterval(() => { Auth.updateHeartbeat(); }, 60000);
+  setInterval(() => { Auth.updateHeartbeat(); }, 60000);
   Auth.updateHeartbeat();
   setInterval(() => { if (!document.hidden) poll(); }, 30000);
   setInterval(() => { if (!document.hidden) notifyDuels(); }, 6000);
-  // 👇 优化：手机息屏或切后台时，彻底关闭音频并清理系统播放器
+
+  async function checkIncomingTrades() {
+    try {
+      const trades = await Auth.getPendingTrades();
+      if (!trades || !trades.length || $('trade-receive-modal').classList.contains('open')) return;
+      
+      const trade = trades[0];
+      currentTradeId = trade.id;
+      
+      const friend = Auth.users().find(u => u.uid === trade.challenger_id);
+      const fName = friend ? friend.name : '对方';
+      const cp = trade.challenger_pet;
+      const pt = PET_TYPES.find(t => t.id === cp.type) || PET_TYPES[0];
+
+      $('trade-target-pet').replaceChildren(
+        el('img', { src: petImageOf(cp), style: 'width:50px; height:50px' }),
+        el('div', {}, el('b', { textContent: fName + '的' }), el('div', { textContent: `${pt.name} Lv.${cp.level}` }))
+      );
+
+      const myBox = $('trade-my-pets-for-reply');
+      myBox.replaceChildren();
+      state.tempTradeReplyPetIndex = undefined;
+      const myPets = state.box.filter(p => !p.isActive);
+      
+      if (!myPets.length) {
+        myBox.append(el('div', { className: 'hint', textContent: '你的收纳箱为空，无法交换！' }));
+      } else {
+        myPets.forEach((p, index) => {
+          const pType = PET_TYPES.find(t => t.id === p.type) || PET_TYPES[0];
+          const btnEl = el('div', { 
+            style: 'border:2px solid transparent; border-radius:10px; padding:8px; background:var(--soft); text-align:center; cursor:pointer; width:80px',
+            onclick: () => {
+              myBox.querySelectorAll('div').forEach(d => d.style.borderColor = 'transparent');
+              btnEl.style.borderColor = 'var(--primary)';
+              state.tempTradeReplyPetIndex = index;
+            }
+          },
+            el('img', { src: petImageOf(p), style: 'width:50px; height:50px; object-fit:contain' }),
+            el('div', { style: 'font-size:.7rem; font-weight:bold; margin-top:4px' }, `${pType.name} Lv.${p.level}`)
+          );
+          myBox.append(btnEl);
+        });
+      }
+      openModal('trade-receive-modal');
+    } catch (e) { console.warn('检查收到的交易失败', e); }
+  }
+
+  // 【发起方】检查是否被同意 或 被拒绝
+  let isProcessingMyTrade = false;
+  async function checkMyTradeResults() {
+    if (isProcessingMyTrade) return;
+    isProcessingMyTrade = true;
+    try {
+      const myUid = (await Auth.sb.auth.getUser()).data.user.id;
+      
+      // 👇 核心修改1：同时查询 accepted（同意）和 rejected（拒绝）状态
+      const { data: trades, error: fetchErr } = await Auth.sb.from('pet_trades')
+        .select('*').eq('challenger_id', myUid).in('status', ['accepted', 'rejected']).limit(1);
+      if (fetchErr) throw fetchErr;
+      
+      if (trades && trades.length > 0) {
+        const trade = trades[0];
+        
+        if (trade.status === 'accepted') {
+          // ===== 对方同意了：发宠物 =====
+          const { data: updated, error: err } = await Auth.sb.from('pet_trades')
+            .update({ status: 'finished' }).eq('id', trade.id).eq('status', 'accepted').select();
+          if (err) throw err;
+          
+          if (updated && updated.length > 0) {
+            await ACTIONS.playTradeAnimation(trade.challenger_pet, trade.defender_pet);
+            state.warehouse.push(trade.defender_pet);
+            save(); pushSave(true); render();
+            toast('🎁 交换成功！新宠物已存入仓库。');
+          }
+        } 
+        else if (trade.status === 'rejected') {
+          // ===== 👇 核心修改2：对方拒绝了，退还宠物 =====
+          const { data: updated, error: err } = await Auth.sb.from('pet_trades')
+            .update({ status: 'finished' }).eq('id', trade.id).eq('status', 'rejected').select();
+          if (err) throw err;
+          
+          if (updated && updated.length > 0) {
+            // 将宠物塞回你的收纳箱
+            state.box.push(trade.challenger_pet);
+            save(); pushSave(true); render();
+            toast('❌ 对方拒绝了你的交换请求，宠物已退回。');
+          }
+        }
+      }
+    } catch (e) { 
+      console.warn('获取交易结果失败', e); 
+    } finally {
+      isProcessingMyTrade = false;
+    }
+  }
+
+  // 【接收方】检查状态是否被 A 结算完毕
+  let isProcessingDefenderTrade = false;
+  async function checkDefenderTradeResults() {
+    if (isProcessingDefenderTrade) return;
+    isProcessingDefenderTrade = true;
+    try {
+      const myUid = (await Auth.sb.auth.getUser()).data.user.id;
+      // 只查 completed 状态的记录
+      const { data: trades, error: fetchErr } = await Auth.sb.from('pet_trades')
+        .select('*').eq('defender_id', myUid).eq('status', 'completed').limit(1);
+      if (fetchErr) throw fetchErr;
+      
+      if (trades && trades.length > 0) {
+        const trade = trades[0];
+        // 👇 核心修改：把 delete() 换成 update({ status: 'finished' })
+        const { data: updated, error: err } = await Auth.sb.from('pet_trades')
+          .update({ status: 'finished' })
+          .eq('id', trade.id)
+          .eq('status', 'completed')
+          .select(); 
+        if (err) throw err;
+        
+        // 只有真正更新成功了，才播动画和发宠物
+        if (updated && updated.length > 0) {
+          await ACTIONS.playTradeAnimation(trade.defender_pet, trade.challenger_pet);
+          state.warehouse.push(trade.challenger_pet);
+          save(); pushSave(true); render();
+          toast('🎁 交换成功！新宠物已存入仓库。');
+        }
+      }
+    } catch (e) { 
+      console.warn('接收方获取交易结果失败', e); 
+    } finally {
+      isProcessingDefenderTrade = false;
+    }
+  }
+
+  setInterval(() => { if (!document.hidden) checkIncomingTrades(); }, 8000);
+  setInterval(() => { if (!document.hidden) checkMyTradeResults(); }, 10000);
+  setInterval(() => { if (!document.hidden) checkDefenderTradeResults(); }, 10000);
+
+  // 👇 2. 完美版：手机息屏/切后台音乐清理逻辑 👇
   function stopAndClearAudio() {
     if (!player) return;
     if (!player.paused) {
       window.wasPlayingBeforeHidden = true; // 记住之前是在播放的
     }
     player.pause();
-    // 核心魔法：清空源并重新加载，强行让手机系统的音乐控制器消失
     player.removeAttribute('src'); 
     player.src = ''; 
     player.load(); 
@@ -2385,7 +2648,6 @@ setInterval(() => { Auth.updateHeartbeat(); }, 60000);
       // 如果之前是在播放的，且没静音，就重新获取音乐并播放
       if (window.wasPlayingBeforeHidden && !player.muted) {
         window.wasPlayingBeforeHidden = false;
-        // 判断一下是不是在对战界面，如果在就播战斗曲，不在就播大厅曲
         const isDuelModal = document.getElementById('duel-modal')?.classList.contains('open');
         if (isDuelModal) {
           playFightBgm();
@@ -2396,13 +2658,50 @@ setInterval(() => { Auth.updateHeartbeat(); }, 60000);
     } 
   });
 
-  // 直接退出网页或者刷新时，同样清空音频，防止卡片残留
   window.addEventListener('pagehide', () => { 
     stopAndClearAudio(); 
     if (synced) pushSave(true); 
   });
+
 }).catch(() => {});
 
 </script>
+<!-- 交换弹窗：发起方选宠物 -->
+<div id="trade-select-modal" class="modal-overlay" role="dialog">
+  <div class="modal-box" style="text-align:left; width:min(400px, 90vw)">
+    <h3 style="color:var(--primary); margin-bottom:8px">🔄 发起宠物交换</h3>
+    <div class="hint" style="margin-bottom:12px">选择你的一只宠物（仅限收纳箱里的，不包括正在出战的）。</div>
+    <div id="trade-my-pets" style="display:flex; flex-wrap:wrap; gap:8px; max-height:300px; overflow-y:auto; padding: 4px;"></div>
+    <div style="display:flex; gap:8px; margin-top:16px">
+      <button class="btn-action btn-block btn-gold" data-action="confirmTradeSend">确认发起</button>
+      <button class="btn-action btn-block" data-action="close">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 交换弹窗：接收方选宠物回应 -->
+<div id="trade-receive-modal" class="modal-overlay" role="dialog">
+  <div class="modal-box" style="text-align:left; width:min(400px, 90vw)">
+    <h3 style="color:var(--primary); margin-bottom:8px">📩 收到宠物交换请求</h3>
+    <div class="hint" style="margin-bottom:12px">好友想用他的宠物，换你的一只宠物。请选择你要拿出的宠物：</div>
+    <div id="trade-target-pet" style="background:var(--soft); border-radius:10px; padding:10px; display:flex; align-items:center; gap:10px; margin-bottom:12px"></div>
+    <div style="font-weight:bold; font-size:.85rem; margin-bottom:6px">选择你的回礼：</div>
+    <div id="trade-my-pets-for-reply" style="display:flex; flex-wrap:wrap; gap:8px; max-height:200px; overflow-y:auto; padding: 4px;"></div>
+    <div style="display:flex; gap:8px; margin-top:16px">
+      <button class="btn-action btn-block btn-gold" data-action="confirmTradeReply">同意交换</button>
+      <button class="btn-action btn-block" style="background:#fde8e8; color:#c22" data-action="rejectTradeReply">拒绝</button>
+    </div>
+  </div>
+</div>
+
+<!-- 全屏交换动画层 -->
+<div id="trade-anim-layer" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center;">
+  <div style="position:relative; width:100%; max-width:500px; height:300px;">
+    <img id="anim-pet-left" style="position:absolute; left:0; top:50%; transform:translateY(-50%); width:100px; height:100px; object-fit:contain; transition:all 1s cubic-bezier(0.4, 0, 0.2, 1); z-index:2" src="">
+    <img id="anim-pet-right" style="position:absolute; right:0; top:50%; transform:translateY(-50%); width:100px; height:100px; object-fit:contain; transition:all 1s cubic-bezier(0.4, 0, 0.2, 1); z-index:2" src="">
+    <div id="anim-flash" style="position:absolute; left:50%; top:50%; transform:translate(-50%, -50%) scale(0); font-size:4rem; opacity:0; transition:all 0.3s; z-index:3">💥</div>
+    <div id="anim-text" style="position:absolute; bottom:20px; width:100%; text-align:center; color:#fff; font-weight:bold; font-size:1.5rem; opacity:0; transition:opacity 0.5s">交换成功！</div>
+  </div>
+</div>
 </body>
 </html>
