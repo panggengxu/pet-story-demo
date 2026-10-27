@@ -68,7 +68,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .pet-act{display:flex;gap:6px}.pet-act .btn-action{flex:1}
 .power{font-weight:700;color:var(--primary)}
 /* ===== 技能区 ===== */
-.skill-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:220px;overflow-y:auto;padding:2px}
+.skill-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:220px;overflow-y:auto;overflow-x: hidden;padding:4px}
 .skill-meta{font-size:.68rem;opacity:.85;margin-top:2px;font-weight:400}
 .skill-locked{margin-top:8px}
 .skill-chip{display:inline-block;background:#eee;color:#777;border-radius:10px;padding:2px 8px;margin:2px 4px 2px 0;font-size:.74rem}
@@ -313,6 +313,32 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
       <div class="hint" style="margin-bottom:10px">点击装备下方的“穿戴”，即可装到宠物身上。带 🔁 的是重复装备，可以分解换金币。</div>
       <button class="btn-action btn-gold" data-action="sellDup" style="margin-bottom:10px">♻️ 一键分解重复装备</button>
       <div id="inventory-container" style="display:flex;flex-wrap:wrap;gap:10px; max-height: 380px; overflow-y: auto; padding-right: 5px;"></div>
+
+      <!-- 👇 新增：主题盲盒区 👇 -->
+      <div class="card-title" style="margin-top:24px">THEME GACHA（主题盲盒）</div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:16px">
+        
+        <!-- Minecraft 主题盲盒 -->
+        <div style="border:2px dashed #2e7d32; border-radius:16px; padding:30px 20px; text-align:center; background:#f1f8e9; position:relative; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+          <div style="position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:#2e7d32; color:#fff; font-size:.75rem; font-weight:bold; padding:2px 10px; border-radius:10px; white-space:nowrap">方块世界限定</div>
+          
+          <div style="width: 60px; height: 60px; background: #8B5A2B; border: 4px solid #333; position: relative; margin-bottom: 16px; animation: arenaIdle 2s infinite; box-shadow: inset 0 14px 0 #5D9C4A, inset 0 16px 0 #333;">
+            <!-- 像素小点缀 -->
+            <div style="position: absolute; bottom: 5px; left: 5px; width: 8px; height: 8px; background: #6A4522;"></div>
+            <div style="position: absolute; bottom: 18px; right: 8px; width: 10px; height: 10px; background: #6A4522;"></div>
+          </div>
+          <div style="font-weight:bold; font-size:1.2rem; color:#2e7d32; margin-bottom:8px">Minecraft 主题盲盒</div>
+          <div class="hint" style="margin-bottom:24px">每次消耗 <b>150</b>🪙，抽中稀有的方块宠物</div>
+          <div style="width:100%; max-width:240px; display:flex; gap:8px;">
+            <button class="btn-action btn-block" style="background:#fff; border:1px solid #2e7d32; color:#2e7d32; flex:1" data-action="previewTheme" data-theme="minecraft">预览奖池 👀</button>
+            <button class="btn-action btn-block" style="background:#2e7d32; color:#fff; box-shadow:0 4px 10px rgba(46,125,50,0.3); flex:1" data-action="adoptTheme" data-theme="minecraft" data-cost="150">开启盲盒</button>
+          </div>
+          <div class="hint" style="margin-top:16px; font-size:.75rem; color:#2e7d32; background:#dcedc8; padding:4px 12px; border-radius:20px">
+            💎 包含苦力怕、末影人等专属宠物
+          </div>
+        </div>
+
+      </div>
 
       <!-- 👇 新增文具盲盒与商店（彻底分离版） -->
       <div class="card-title" style="margin-top:24px">STATIONERY SHOP & GACHA</div>
@@ -575,7 +601,7 @@ const SUBS = ['BC 华文', 'BM 马来文', 'BI 英文', 'MM 数学', 'SC 科学'
 // stages 是 Lv.1 / Lv.2 / Lv.3 的图片；只有一张图的品种，三个等级都显示这一张，以后补了图，在 stages 里按顺序加路径就行
 const PET_TYPES = [
   // 1. 🐲 末影龙（传说 / 3形态 / 100级满级 / 1.4倍战力）
-  { id: 'ender',  name: '末影龙', weight: 10, rarity: '传说', maxLv: 100, powerMultiplier: 1.4,
+  { id: 'ender',  name: '末影龙',theme: 'minecraft', weight: 10, rarity: '传说', maxLv: 100, powerMultiplier: 1.4,
     stages: [
       { level: 1,  img: 'pet/Ender dragon 1.jpg', name: '末影幼龙' },
       { level: 40, img: 'pet/Ender dragon 2.jpg', name: '觉醒末影龙' },
@@ -584,7 +610,7 @@ const PET_TYPES = [
   },
 
   // 2. 👾 草莓战士 Labubu（神话 / 5形态 / 100级满级 / 1.8倍战力）
-  { id: 'labubu', name: '草莓战士', weight: 2, rarity: '神话', maxLv: 100, powerMultiplier: 1.8,
+  { id: 'labubu', name: '草莓战士',theme: 'basic', weight: 2, rarity: '神话', maxLv: 100, powerMultiplier: 1.8,
     stages: [
       { level: 1,  img: 'pet/pet-labubu1.jpg', name: '紫绒小兔' },
       { level: 20, img: 'pet/pet-labubu2.jpg', name: '草莓骑士' },
@@ -595,7 +621,7 @@ const PET_TYPES = [
   },
 
   // 3. 🐻 天空系飞熊（稀有 / 3形态 / 80级满级 / 1.2倍战力）
-  { id: 'sky',    name: '天空系飞熊', weight: 5, rarity: '稀有', maxLv: 80, powerMultiplier: 1.2,
+  { id: 'sky',    name: '天空系飞熊', theme: 'basic', weight: 5, rarity: '稀有', maxLv: 80, powerMultiplier: 1.2,
     stages: [
       { level: 1,  img: 'pet/pet-sky1.jpg', name: '云朵小飞熊' },
       { level: 30, img: 'pet/pet-sky2.jpg', name: '星月飞熊' },
@@ -604,7 +630,7 @@ const PET_TYPES = [
   },
 
   // 4. 🐱 星空猫咪（稀有 / 3形态 / 80级满级 / 1.2倍战力）
-  { id: 'cosmic', name: '星空猫咪', weight: 5, rarity: '稀有', maxLv: 80, powerMultiplier: 1.2,
+  { id: 'cosmic', name: '星空猫咪', theme: 'basic', weight: 5, rarity: '稀有', maxLv: 80, powerMultiplier: 1.2,
     stages: [
       { level: 1,  img: 'pet/pet-cosmic1.jpg', name: '星尘猫咪' },
       { level: 30, img: 'pet/pet-cosmic2.jpg', name: '星月法神' },
@@ -613,7 +639,7 @@ const PET_TYPES = [
   },
 
   // 5. 🐉 炎系小火龙（普通 / 3形态 / 60级满级 / 1.0倍战力）
-  { id: 'fire',   name: '炎系小火龙', weight: 10, rarity: '普通', maxLv: 60, powerMultiplier: 1.0,
+  { id: 'fire',   name: '炎系小火龙', theme: 'basic', weight: 10, rarity: '普通', maxLv: 60, powerMultiplier: 1.0,
     stages: [
       { level: 1,  img: 'pet/pet-fire1.jpg', name: '幼年小火龙' },
       { level: 20, img: 'pet/pet-fire2.jpg', name: '烈焰飞龙' },
@@ -622,7 +648,7 @@ const PET_TYPES = [
   },
 
   // 6. 🐺 暗影雷狼（普通 / 3形态 / 60级满级 / 1.0倍战力）
-  { id: 'shadow', name: '暗影雷狼', weight: 10, rarity: '普通', maxLv: 60, powerMultiplier: 1.0,
+  { id: 'shadow', name: '暗影雷狼', theme: 'basic', weight: 10, rarity: '普通', maxLv: 60, powerMultiplier: 1.0,
     stages: [
       { level: 1,  img: 'pet/pet-wolf1.jpg', name: '暗影小狼' },
       { level: 20, img: 'pet/pet-wolf2.jpg', name: '雷霆战狼' },
@@ -631,14 +657,14 @@ const PET_TYPES = [
   },
 
   // 7. 🐰 萝卜兔（普通 / 3形态 / 60级满级 / 1.0倍战力）
-  { id: 'plant',  name: '萝卜兔', weight: 15, rarity: '普通', maxLv: 60, powerMultiplier: 1.0,
+  { id: 'plant',  name: '萝卜兔', theme: 'basic', weight: 15, rarity: '普通', maxLv: 60, powerMultiplier: 1.0,
     stages: [
       { level: 1,  img: 'pet/pet-plant1.jpg', name: '小萝卜兔' },
       { level: 20, img: 'pet/pet-plant2.jpg', name: '花冠灵兔' },
       { level: 45, img: 'pet/pet-plant3.jpg', name: '森之精灵王' }
     ] 
   },
-    { id: 'whale', name: '幻海神鲸', weight: 1, rarity: '神话', maxLv: 100, powerMultiplier: 1.8,
+    { id: 'whale', name: '幻海神鲸', theme: 'teacher', weight: 1, rarity: '神话', maxLv: 100, powerMultiplier: 1.8,
     stages: [
       { level: 1,   img: 'pet/pet-whale1.jpg', name: '初雪' },
       { level: 20,  img: 'pet/pet-whale2.jpg', name: '幻雪羽鲸' },
@@ -647,12 +673,30 @@ const PET_TYPES = [
     ] 
   },
   // 9. 🐉 太初神龙（神话 / 4形态 / 100级满级 / 1.8倍战力）
-    { id: 'dragon', name: '太初神龙', weight: 1, rarity: '神话', maxLv: 100, powerMultiplier: 1.8,
+    { id: 'dragon', name: '太初神龙', theme: 'teacher', weight: 1, rarity: '神话', maxLv: 100, powerMultiplier: 1.8,
     stages: [
       { level: 1,   img: 'pet/pet-dragon1.jpg', name: '白灵龙' },
       { level: 20,  img: 'pet/pet-dragon2.jpg', name: '祥云玉龙' },
       { level: 60,  img: 'pet/pet-dragon3.jpg', name: '九天圣龙' },
       { level: 100, img: 'pet/pet-dragon4.jpg', name: '太初神龙' }
+    ] 
+  },
+    // 10. 🧟 僵尸（普通 / 4形态 / 60级满级 / 1.0倍战力）
+  { id: 'zombie', name: '僵尸', theme: 'minecraft', weight: 20, rarity: '普通', maxLv: 60, powerMultiplier: 1.0,
+    stages: [
+      { level: 1,  img: 'pet/pet-zombie1.jpg', name: 'Q版小僵尸' },
+      { level: 20, img: 'pet/pet-zombie2.jpg', name: '经典僵尸' },
+      { level: 40, img: 'pet/pet-zombie3.jpg', name: '铁甲僵尸' },
+      { level: 60, img: 'pet/pet-zombie4.jpg', name: '尸壳领主' }
+    ] 
+  },
+    // 11. 🏹 地狱骨王（稀有 / 4形态 / 80级满级 / 1.2倍战力）
+  { id: 'skeleton', name: '地狱骨王', theme: 'minecraft', weight: 15, rarity: '稀有', maxLv: 80, powerMultiplier: 1.2,
+    stages: [
+      { level: 1,  img: 'pet/pet-skeleton1.jpg', name: '幼年骷髅弓手' }, // 图4：Q版小骷髅
+      { level: 20, img: 'pet/pet-skeleton2.jpg', name: '锁甲射手' },     // 图3：锁链盔甲弓箭手
+      { level: 50, img: 'pet/pet-skeleton3.jpg', name: '铁甲神射手' },   // 图2：铁甲弓箭手
+      { level: 80, img: 'pet/pet-skeleton4.jpg', name: '地狱火骨王' }    // 图1：黑金紫光火焰剑王
     ] 
   },
 ];
@@ -687,10 +731,14 @@ function loadEntry(e) {                                    // 让某只宠物出
 }
 function emptyActive() { state.petType = ''; state.petLevel = 0; state.pet = freshPet(); state.equipped = emptyGear(); }
 function returnGear(g) { Object.values(g || {}).filter(Boolean).forEach(it => state.inventory.push(it)); }   // 放生时，配件回到背包
-function pickPet() {
-  const total = PET_TYPES.reduce((n, t) => n + t.weight, 0);
+function pickPet(theme = 'basic') {
+  // 筛选出该主题下的所有宠物
+  const pool = PET_TYPES.filter(t => (t.theme || 'basic') === theme);
+  if (!pool.length) return PET_TYPES[0]; // 防止没宠物报错
+
+  const total = pool.reduce((n, t) => n + t.weight, 0);
   let r = Math.random() * total;
-  return PET_TYPES.find(t => (r -= t.weight) < 0) || PET_TYPES[0];
+  return pool.find(t => (r -= t.weight) < 0) || pool[0];
 }
 const MUSIC = [
   { cat: '默认音乐', songs: [
@@ -1681,6 +1729,61 @@ saveSkills() {
   }
 },
 
+  adoptTheme({ theme, cost }) {
+    const price = Number(cost) || 150; // 默认 150 金币
+    if (state.coins < price) return toast(`❌ 金币不足，需要 ${price} 金币`);
+    
+    // 检查该主题下有没有宠物
+    const pool = PET_TYPES.filter(t => t.theme === theme);
+    if (!pool.length) return toast('该主题盲盒暂未开放！');
+
+    state.coins -= price;
+    const e = { type: pickPet(theme).id, level: 1, pet: freshPet(70), equipped: emptyGear() };
+    const name = PET_TYPES.find(t => t.id === e.type).name;
+    
+    if (petCount() >= MAX_PETS) {
+      if (!state.warehouse) state.warehouse = [];
+      state.warehouse.push(e);
+      render(); toast(`🎉 恭喜获得「${name}」！已自动存入仓库`);
+    } else {
+      const stored = state.petLevel > 0;
+      if (stored) state.box.push(e); else loadEntry(e);
+      render(); toast(`🎉 恭喜获得「${name}」！`);
+    }
+  },
+
+  previewTheme({ theme }) {
+    // 1. 筛选出该主题下的所有宠物
+    const pool = PET_TYPES.filter(t => t.theme === theme);
+    if (!pool.length) return toast('该主题盲盒暂未开放！');
+
+    // 2. 计算总权重
+    const totalWeight = pool.reduce((s, i) => s + i.weight, 0);
+    const list = $('preview-list');
+    
+    // 3. 动态修改弹窗标题（为了和普通盲盒区分）
+    const modalTitle = document.querySelector('#preview-modal h3');
+    if (modalTitle) modalTitle.textContent = '🟩 Minecraft 主题盲盒奖池';
+
+    // 4. 渲染列表
+    list.replaceChildren(...pool.map(i => {
+      const prob = Math.round((i.weight / totalWeight) * 100);
+      const firstStage = i.stages[0]; 
+      return el('div', { className: 'pool-item', style: 'align-items:center' },
+        el('div', { style: 'display:flex; align-items:center; gap:8px' },
+          el('img', { src: firstStage.img, style: 'width:36px; height:36px; object-fit:contain; border-radius:6px; background:var(--soft)' }),
+          el('span', { textContent: i.name })
+        ),
+        el('span', { 
+          textContent: `${prob}%`, 
+          style: 'color:#2e7d32;font-weight:bold;' 
+        })
+      );
+    }));
+    
+    openModal('preview-modal');
+  },
+
 swapWarehouse({ id }) {
   const i = +id;
   const target = state.warehouse[i];
@@ -1791,6 +1894,10 @@ toWarehouse({ id }) {
     state.inventory.push(it); state.equipped[id] = null; render();
   },
   preview() {
+    // 👇 加上这两行，恢复标题
+    const modalTitle = document.querySelector('#preview-modal h3');
+    if (modalTitle) modalTitle.textContent = '🎁 盲盒奖池预览';
+
     const total = POOL.reduce((s, i) => s + i.weight, 0), list = $('preview-list');
     list.replaceChildren(...POOL.map(i => el('div', { className: 'pool-item' },
       el('span', { textContent: `${i.icon} ${i.name}（${i.type}·${i.rarity}·战力+${i.power}）` }),
@@ -2146,10 +2253,23 @@ async function triggerDuelFriend({ id }) {
 // 进入对战房间（无论是发起方还是被挑战方）
 // 技能按钮：用 data-action / data-skill，由全局点击监听调用 ACTIONS.useSkill
 // （注意：el() 里写 onclick: 'useSkill(1)' 是无效的——DOM 的 onclick 属性只接受函数，字符串会被丢掉）
-function skillBtn(sk) {                                     // sk = 技能表里的一行
-  const b = el('button', { className: 'skill-btn', type: 'button' }, `${sk.emoji} ${sk.name}`,
-    el('div', { className: 'skill-desc', textContent: sk.desc + (sk.heal ? `（吸血 ${Math.round(sk.heal * 100)}%）` : '') }),
-    el('div', { className: 'skill-meta', textContent: `命中 ${sk.hit}% · 伤害 ×${sk.mult}` }));
+function skillBtn(sk, leftUses = 99) {
+  const b = el('button', { className: 'skill-btn', type: 'button' }, `${sk.emoji} ${sk.name}`);
+  
+  // 如果次数用尽，变灰且不可点
+  if (leftUses <= 0) {
+    b.disabled = true;
+    b.style.opacity = '0.5';
+    b.style.filter = 'grayscale(1)';
+    b.append(el('div', { className: 'skill-desc', textContent: '次数已用尽' }));
+    b.append(el('div', { className: 'skill-meta', textContent: '无法使用' }));
+  } else {
+    let descText = sk.descr + (sk.heal ? `（吸血 ${Math.round(sk.heal * 100)}%）` : '');
+    b.append(el('div', { className: 'skill-desc', textContent: descText }));
+    // 显示剩余次数
+    b.append(el('div', { className: 'skill-meta', textContent: `剩余 ${leftUses} 次 · 命中 ${sk.hit}%` }));
+  }
+  
   b.dataset.action = 'useSkill';
   b.dataset.skill = String(sk.code);
   return b;
@@ -2159,33 +2279,37 @@ function fillSkills(type, lv) {
   if (!area) return;
   type = type || state.petType; lv = lv || state.petLevel || 1;
   
-  // 找出该品种、且等级满足的所有已解锁技能
   const allAvailable = Auth.skills().filter(x => x.type === type && x.unlock <= lv);
   const locked = Auth.skills().filter(x => x.type === type && x.unlock > lv);
   
-  // 如果玩家配置过技能，优先用玩家配置的（且还在可用列表里）
   let open = [];
   if (state.equippedSkills && state.equippedSkills.length > 0) {
     open = state.equippedSkills.map(code => allAvailable.find(s => s.code === code)).filter(Boolean);
   }
-  
-  // 如果玩家没配置，或者配置的都失效了，就默认取前 4 个
-  if (open.length === 0) {
-    open = allAvailable.slice(0, 4);
+  if (open.length === 0) open = allAvailable.slice(0, 4);
+
+  // 保底机制：强制塞入 Lv.1 技能，防止次数用光卡死
+  const baseSkill = allAvailable.find(s => s.unlock === 1);
+  if (baseSkill && !open.some(s => s.code === baseSkill.code)) {
+    open.push(baseSkill); 
   }
 
   area.replaceChildren();
-  if (!Auth.skills().some(x => x.type === type)) {
-    return area.append(el('div', { className: 'hint', textContent: '这只宠物的技能表还没有建好。' }));
-  }
   if (!open.length) {
     return area.append(el('div', { className: 'hint', textContent: '还没有可用技能，快去升级吧！' }));
   }
 
-  area.append(el('div', { className: 'skill-grid' }, ...open.map(skillBtn)));
-  if (locked.length) area.append(el('div', { className: 'skill-locked' },
-    el('div', { className: 'hint', textContent: `🔒 还有 ${locked.length} 个技能没解锁（升级、进化后解锁）：` }),
-    ...locked.map(x => el('span', { className: 'skill-chip', textContent: `Lv.${x.unlock} ${x.emoji} ${x.name}` }))));
+  const myUid = Auth.users().find(u => u.id === me.id)?.uid;
+  const currentLogs = window.currentDuelLogs || [];
+
+  area.append(el('div', { className: 'skill-grid' }, ...open.map(sk => {
+    const maxUses = sk.max_uses || 99;
+    // 计算自己用了几次
+    const usedCount = currentLogs.filter(l => l.who === myUid && l.skill === sk.code).length;
+    const left = maxUses - usedCount;
+    
+    return skillBtn(sk, left);
+  })));
 }
 
 // ===== 对战舞台：两只宠物面对面，出招时冲过去、特效飞过去、对方抖动变红、头上飘伤害数字 =====
@@ -2276,6 +2400,8 @@ async function pollDuelState(duelId) {
     const { data: rows, error } = await Auth.sb.rpc('duel_state', { p_duel_id: duelId });
     if (error) throw error;
     const d = (rows || [])[0];
+        // 👇 就是这句，把最新的日志存到全局，技能次数才能刷新
+    window.currentDuelLogs = d.rounds || [];
     if (!d) throw new Error('找不到这场战斗');
     
     const myUid = Auth.users().find(u => u.id === me.id)?.uid;
@@ -2290,15 +2416,29 @@ async function pollDuelState(duelId) {
     const oppUid = isChallenger ? d.defender : d.challenger;
     const oppName = Auth.friends().find(f => f.otherId === oppUid)?.name || Auth.users().find(u => u.uid === oppUid)?.name || '对手';
 
-    const renderHp = (name, current, max) => el('div', { style: 'text-align:center;flex:1;padding:0 5px' },
-      el('div', { textContent: name, style: 'font-weight:bold' }),
-      el('div', { className: 'hp-bar' }, el('div', { className: 'hp-fill' + (current/max < 0.3 ? ' dead' : current/max < 0.6 ? ' low' : ''), style: `width:${(current/max)*100}%` })),
-      el('div', { className: 'hint', textContent: `${Math.round(current)} / ${Math.round(max)}` })
-    );
+    const renderHp = (name, current, max, statusList) => {
+      // 生成状态图标
+      let statusHtml = '';
+      if (statusList && statusList.length > 0) {
+        statusHtml = statusList.map(s => {
+          const iconMap = { poison: '☠️', burn: '🔥', bleed: '🩸', paralysis: '⚡', freeze: '❄️', vulnerable: '💥' };
+          return `<span title="${s.type} 剩余 ${s.turns} 回合" style="display:inline-block; margin:0 2px; font-size:1.1rem; animation: arenaIdle 1s infinite">${iconMap[s.type] || '❓'}</span>`;
+        }).join('');
+      }
+
+      return el('div', { style: 'text-align:center;flex:1;padding:0 5px' },
+        el('div', { textContent: name, style: 'font-weight:bold' }),
+        el('div', { className: 'hp-bar' }, el('div', { className: 'hp-fill' + (current/max < 0.3 ? ' dead' : current/max < 0.6 ? ' low' : ''), style: `width:${(current/max)*100}%` })),
+        el('div', { className: 'hint', textContent: `${Math.round(current)} / ${Math.round(max)}` }),
+        el('div', { innerHTML: statusHtml, style: 'margin-top: 4px; min-height: 20px;' }) // 👈 状态图标区
+      );
+    };
+    
+    // 注意这里，调用 renderHp 的时候，把双方的状态传进去了
     $('duel-hp-area').replaceChildren(
-      renderHp(me.name + '（我）', myHp, maxMyHp),
+      renderHp(me.name + '（我）', myHp, maxMyHp, isChallenger ? d.a_status : d.b_status),
       el('div', { textContent: 'VS', style: 'font-weight:bold;color:var(--primary);margin-top:20px' }),
-      renderHp(oppName, oppHp, maxOppHp)
+      renderHp(oppName, oppHp, maxOppHp, isChallenger ? d.b_status : d.a_status)
     );
     
     arenaUpdate(d, isChallenger, myUid, d.rounds || [], myHp, oppHp, oppName, oppUid);   // 战斗舞台的演出
@@ -2308,8 +2448,38 @@ async function pollDuelState(duelId) {
     $('duel-log').replaceChildren(...logs.map(l => {
       const isMyAttack = l.who === myUid;
       const sk = Auth.skillByCode(l.skill), skillName = sk ? sk.emoji + ' ' + sk.name : '技能';
-      return el('div', { style: isMyAttack ? 'color:var(--primary);margin-bottom:4px' : 'color:#d33;margin-bottom:4px' }, 
-        `${isMyAttack ? '👉 你' : '🔥 对方'}使用了【${skillName}】[cite: 16]，${l.dmg > 0 ? `造成 ${Math.round(l.dmg)} 点伤害！` : '被闪避了！'}${l.heal > 0 ? ` 并恢复了 ${l.heal} 点血量。` : ''}`);
+      const color = isMyAttack ? 'var(--primary)' : '#d33';
+      
+      let text = `${isMyAttack ? '👉 你' : '🔥 对方'}使用了【${skillName}】`;
+      
+      if (l.skip) {
+         text += `，但由于被【麻痹】，无法行动！`;
+      } else {
+         if (l.dmg > 0) text += `，造成 ${Math.round(l.dmg)} 点伤害！`;
+         else text += `，被闪避了！`;
+         
+         if (l.heal > 0) text += ` 吸血恢复了 ${l.heal} 点。`;
+         
+         // 👇 新增：播报挂上了什么状态
+         if (l.effect) {
+            const effectMap = { poison: '☠️中毒', burn: '🔥灼伤', bleed: '🩸流血', paralysis: '⚡麻痹', freeze: '❄️冰冻', vulnerable: '💥易伤' };
+            // 👇 如果是自己打的，让对手陷入；如果是对方打的，让你陷入。
+            text += isMyAttack 
+              ? ` 让对手陷入了【${effectMap[l.effect] || l.effect}】状态！`
+              : ` 让你陷入了【${effectMap[l.effect] || l.effect}】状态！`;
+         }
+         
+         if (l.immune) {
+            text += ` 🛡️ 但对方触发了属性免疫，免疫了状态！`;
+         }
+         
+         // 👇 播报被毒/火烧的伤害
+         if (l.atk_dot > 0) {
+            text += ` 💥 受到状态反噬，损失了 ${l.atk_dot} 点生命！`;
+         }
+      }
+
+      return el('div', { style: `color:${color};margin-bottom:4px` }, text);
     }));
     if(logs.length) $('duel-log').scrollTop = $('duel-log').scrollHeight;
     
@@ -2335,7 +2505,8 @@ async function pollDuelState(duelId) {
       clearInterval(duelInterval);
     } else if (isMyTurn) {
       skillArea.style.display = 'grid';
-      skillArea.querySelectorAll('.skill-btn').forEach(b => b.disabled = false);
+      // 👇 关键修复：轮到自己时，重新渲染技能，计算剩余次数！
+      fillSkills(isChallenger ? d.a_pet : d.b_pet, isChallenger ? d.a_lv : d.b_lv);
       $('duel-title').textContent = '🎯 轮到你出招了！';
     } else {
       skillArea.style.display = 'grid';
