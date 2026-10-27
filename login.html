@@ -35,7 +35,7 @@ input:focus,button:focus-visible{outline:3px solid var(--accent);outline-offset:
     <label for="uid">账号</label>
     <input id="uid" required autocapitalize="off" placeholder="学生填学号，例如 s001">
     <label for="pw">密码</label>
-    <input id="pw" type="password" required>
+    <input id="pw" type="password" required autocomplete="current-password">
     <div id="err" role="alert"></div>
     <button class="go" id="go">登录</button>
   </form>
