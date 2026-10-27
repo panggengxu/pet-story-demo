@@ -68,7 +68,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .pet-act{display:flex;gap:6px}.pet-act .btn-action{flex:1}
 .power{font-weight:700;color:var(--primary)}
 /* ===== 技能区 ===== */
-.skill-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:220px;overflow-y:auto;overflow-x: hidden;padding:4px}
+.skill-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:280px;overflow-y:auto;overflow-x: hidden;padding:4px}
 .skill-meta{font-size:.68rem;opacity:.85;margin-top:2px;font-weight:400}
 .skill-locked{margin-top:8px}
 .skill-chip{display:inline-block;background:#eee;color:#777;border-radius:10px;padding:2px 8px;margin:2px 4px 2px 0;font-size:.74rem}
@@ -124,7 +124,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .hp-fill.dead { background: #ff4d4d; }
 .dmg-text { position: absolute; color: #ff4d4d; font-weight: bold; font-size: 1.5rem; pointer-events: none; opacity: 0; transform: translateY(0); transition: all 0.6s; text-shadow: 1px 1px 2px #fff; }
 .dmg-text.show { opacity: 1; transform: translateY(-40px); }
-.skill-btn { background: var(--primary); color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.9rem; }
+.skill-btn { background: var(--primary); color: #fff; border: none; padding: 8px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.9rem; }
 .skill-btn:hover:not(:disabled) { background: #3311cc; transform: scale(1.05); }
 .skill-btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
 .skill-desc { font-size: 0.7rem; color: #fff; opacity: 0.8; margin-top: 4px; font-weight: normal; }
@@ -2422,7 +2422,7 @@ async function pollDuelState(duelId) {
       if (statusList && statusList.length > 0) {
         statusHtml = statusList.map(s => {
           const iconMap = { poison: '☠️', burn: '🔥', bleed: '🩸', paralysis: '⚡', freeze: '❄️', vulnerable: '💥' };
-          return `<span title="${s.type} 剩余 ${s.turns} 回合" style="display:inline-block; margin:0 2px; font-size:1.1rem; animation: arenaIdle 1s infinite">${iconMap[s.type] || '❓'}</span>`;
+          return `<span title="${s.type} 剩余 ${s.turns} 回合" style="display:inline-block; margin:0 4px; font-size:1.1rem; animation: arenaIdle 1s infinite; line-height:1;">${iconMap[s.type] || '❓'}<span style="font-size:0.75rem; color:#64748b; font-weight:bold; vertical-align:middle; margin-left:2px">${s.turns}</span></span>`;
         }).join('');
       }
 
