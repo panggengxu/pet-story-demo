@@ -637,7 +637,15 @@ const PET_TYPES = [
       { level: 20, img: 'pet/pet-plant2.jpg', name: '花冠灵兔' },
       { level: 45, img: 'pet/pet-plant3.jpg', name: '森之精灵王' }
     ] 
-  }
+  },
+    { id: 'whale', name: '幻海神鲸', weight: 1, rarity: '神话', maxLv: 100, powerMultiplier: 1.8,
+    stages: [
+      { level: 1,   img: 'pet/pet-whale1.jpg', name: '初雪' },
+      { level: 20,  img: 'pet/pet-whale2.jpg', name: '幻雪羽鲸' },
+      { level: 60,  img: 'pet/pet-whale3.jpg', name: '圣雪天鲸' },
+      { level: 100, img: 'pet/pet-whale4.jpg', name: '星耀雪神' }
+    ] 
+  },
 ];
 const petType = () => PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
 // 根据当前等级，获取对应的图片
