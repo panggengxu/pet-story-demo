@@ -646,6 +646,15 @@ const PET_TYPES = [
       { level: 100, img: 'pet/pet-whale4.jpg', name: '星耀雪神' }
     ] 
   },
+  // 9. 🐉 太初神龙（神话 / 4形态 / 100级满级 / 1.8倍战力）
+    { id: 'dragon', name: '太初神龙', weight: 1, rarity: '神话', maxLv: 100, powerMultiplier: 1.8,
+    stages: [
+      { level: 1,   img: 'pet/pet-dragon1.jpg', name: '白灵龙' },
+      { level: 20,  img: 'pet/pet-dragon2.jpg', name: '祥云玉龙' },
+      { level: 60,  img: 'pet/pet-dragon3.jpg', name: '九天圣龙' },
+      { level: 100, img: 'pet/pet-dragon4.jpg', name: '太初神龙' }
+    ] 
+  },
 ];
 const petType = () => PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
 // 根据当前等级，获取对应的图片
