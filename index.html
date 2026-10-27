@@ -1618,7 +1618,7 @@ const ACTIONS = {
       cb,
       el('div', {},
         el('div', { style: 'font-weight:bold' }, `${sk.emoji} ${sk.name}`),
-        el('div', { className: 'hint', style: 'font-size:.75rem' }, `${sk.desc} · 命中${sk.hit}% · 伤害×${sk.mult}`)
+        el('div', { className: 'hint', style: 'font-size:.75rem' }, `${sk.descr} · 命中${sk.hit}% · 伤害×${sk.mult} · 次数${sk.max_uses || 99}`)
       )
     ));
   });
