@@ -725,6 +725,18 @@ const petImage = (typeId, lv) => {
   return currentImg;
 };
 
+const petStageName = (typeId, lv) => {
+  const pt = PET_TYPES.find(t => t.id === typeId) || PET_TYPES[0];
+  let current = pt.stages[0];
+  for (let i = pt.stages.length - 1; i >= 0; i--) {
+    if (lv >= pt.stages[i].level) {
+      current = pt.stages[i];
+      break;
+    }
+  }
+  return current.name;
+};
+
 // 兼容旧的宠物盒/对战调用
 const petImageOf = e => {
   return petImage(e.type, e.level);
@@ -875,7 +887,7 @@ function renderWarehouse() {
     const pt = PET_TYPES.find(t => t.id === e.type) || PET_TYPES[0];
     box.append(el('div', { className: 'team-item-card', style: 'flex-direction:column; align-items:flex-start; width:160px; padding:12px' },
       el('img', { src: petImageOf(e), style: 'width:100%; height:100px; object-fit:contain; background:var(--soft); border-radius:10px; margin-bottom:8px' }),
-      el('div', { style: 'font-weight:bold; font-size:.9rem' }, pt.name),
+      el('div', { style: 'font-weight:bold; font-size:.9rem' }, petStageName(e.type, e.level)),\
       el('div', { className: 'hint', style: 'margin-bottom:8px' }, `Lv.${e.level} · 战力 ${calcSinglePetPower(e)}`),
       btn('调出到收纳箱', 'swapWarehouse', { id: i }, 'btn-action btn-block')
     ));
@@ -1427,7 +1439,7 @@ const ACTIONS = {
         }
       },
         el('img', { src: petImageOf(p), style: 'width:50px; height:50px; object-fit:contain' }),
-        el('div', { style: 'font-size:.7rem; font-weight:bold; margin-top:4px' }, `${pt.name} Lv.${p.level}`)
+        el('div', { style: 'font-size:.7rem; font-weight:bold; margin-top:4px' }, `${petStageName(p.type, p.level)} Lv.${p.level}`)
       );
       box.append(btnEl);
     });
@@ -1566,7 +1578,7 @@ const ACTIONS = {
         list.append(el('div', { className: 'team-item-card' },
           el('img', { src: petImageOf(p), style: 'width:48px;height:48px;border-radius:10px;' }),
           el('div', { style: 'flex:1;font-weight:bold;font-size:.9rem;display:flex;align-items:center;gap:6px' }, 
-            pt.name, 
+            petStageName(p.type, p.level), 
             p.isActive ? el('span', { style: 'background:var(--ok);color:#fff;font-size:.65rem;padding:1px 6px;border-radius:6px', textContent: '出战' }) : ''
           ),
           el('div', { style: 'font-weight:bold;color:var(--primary)' }, `⚔️ ${calcSinglePetPower(p)}`)
@@ -2700,7 +2712,7 @@ render();
 
       $('trade-target-pet').replaceChildren(
         el('img', { src: petImageOf(cp), style: 'width:50px; height:50px' }),
-        el('div', {}, el('b', { textContent: fName + '的' }), el('div', { textContent: `${pt.name} Lv.${cp.level}` }))
+        el('div', {}, el('b', { textContent: fName + '的' }), el('div', { textContent: `${petStageName(cp.type, cp.level)} Lv.${cp.level}` }))
       );
 
       const myBox = $('trade-my-pets-for-reply');
@@ -2722,7 +2734,7 @@ render();
             }
           },
             el('img', { src: petImageOf(p), style: 'width:50px; height:50px; object-fit:contain' }),
-            el('div', { style: 'font-size:.7rem; font-weight:bold; margin-top:4px' }, `${pType.name} Lv.${p.level}`)
+            el('div', { style: 'font-size:.7rem; font-weight:bold; margin-top:4px' }, `${petStageName(p.type, p.level)} Lv.${p.level}`)`)
           );
           myBox.append(btnEl);
         });
