@@ -970,7 +970,7 @@ function renderPetBox() {                                  // 「我的宠物 n/
   list.replaceChildren();
   const row = (e, note, acts) => el('div', { style: 'display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)' },
     el('img', { src: petImageOf(e), alt: '', style: 'width:44px;height:44px;object-fit:contain;border-radius:8px;background:var(--soft)' }),
-    el('div', { style: 'flex:1;min-width:0;font-size:.85rem' }, el('b', { textContent: (PET_TYPES.find(t => t.id === e.type) || PET_TYPES[0]).name }), el('div', { className: 'hint', textContent: note })),
+    el('div', { style: 'flex:1;min-width:0;font-size:.85rem' }, el('b', { textContent: petStageName(e.type, e.level) }), el('div', { className: 'hint', textContent: note })),
     ...acts);
   if (state.petLevel > 0) list.append(row(activeAsEntry(), `出战中 · Lv.${state.petLevel}`, [btn('收起来', 'storePet', {}), btn('放生', 'releasePet', { id: 'active' }, 'unequip')]));
   state.box.forEach((e, i) => list.append(row(e, `已收起 · Lv.${e.level}`, [btn('出战', 'swapPet', { id: i }), btn('存仓库', 'toWarehouse', { id: i }), btn('放生', 'releasePet', { id: i }, 'unequip')])));
@@ -1852,7 +1852,7 @@ toWarehouse({ id }) {
   releasePet({ id }) {                                     // 放生：释放名额，配件回到背包
     const isActive = id === 'active', e = isActive ? activeAsEntry() : state.box[+id];
     if (!e) return;
-    const name = (PET_TYPES.find(t => t.id === e.type) || PET_TYPES[0]).name;
+    const name = petStageName(e.type, e.level);
     if (!confirm(`确定放生「${name}」（Lv.${e.level}）吗？放生后找不回来，它身上的配件会回到背包。`)) return;
     returnGear(e.equipped);
     if (isActive) emptyActive(); else state.box.splice(+id, 1);
