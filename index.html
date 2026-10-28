@@ -270,14 +270,16 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
             </div>
             <div id="pet-say" class="hint" style="margin:8px 0 12px;min-height:1.2em"></div>
           </div>
+          <!-- 👇 把装备按钮和技能按钮并排放在最显眼的地方 -->
+          <div style="display:flex; justify-content:space-between; gap:8px; margin-top:12px; margin-bottom:12px;">
+            <button class="btn-action btn-gold" style="flex:1; padding:10px;" data-action="openSkillModal">⚙️ 配置出战技能</button>
+            <button class="btn-action" style="flex:1; padding:10px;" data-action="tab" data-id="shop">去背包穿戴 🎒</button>
+          </div>
+
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:.85rem;font-weight:bold">六格装备栏（点击“卸下”可取下）</span>
-            <button class="btn-action" data-action="tab" data-id="shop">去背包穿戴 🎒</button>
           </div>
           <div class="slots-grid" id="equipment-slots"></div>
-          <div style="margin-top:12px; text-align:right;">
-            <button class="btn-action btn-gold" data-action="openSkillModal">⚙️ 配置出战技能</button>
-          </div>
         </div>
       </div>
     </div>
