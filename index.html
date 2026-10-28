@@ -2495,10 +2495,12 @@ async function pollDuelState(duelId) {
          // 👇 新增：播报挂上了什么状态
          if (l.effect) {
             const effectMap = { poison: '☠️中毒', burn: '🔥灼伤', bleed: '🩸流血', paralysis: '⚡麻痹', freeze: '❄️冰冻', vulnerable: '💥易伤' };
-            // 👇 如果是自己打的，让对手陷入；如果是对方打的，让你陷入。
+            // 👇 核心修复：把 "burn,bleed" 拆开翻译，再用顿号拼接
+            const effectNames = l.effect.split(',').map(e => effectMap[e] || e).join('、');
+            
             text += isMyAttack 
-              ? ` 让对手陷入了【${effectMap[l.effect] || l.effect}】状态！`
-              : ` 让你陷入了【${effectMap[l.effect] || l.effect}】状态！`;
+              ? ` 让对手陷入了【${effectNames}】状态！`
+              : ` 让你陷入了【${effectNames}】状态！`;
          }
          
          if (l.immune) {
