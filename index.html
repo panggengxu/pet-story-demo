@@ -756,6 +756,18 @@ const PET_TYPES = [
       { level: 80, img: 'pet/pet-illager4.jpg', name: '灾厄帝君' }
     ] 
   },
+    // 18. 💀 最终吞噬者（神话 / 7形态 / 100级满级 / 1.8倍战力）
+  { id: 'wither', name: '最终吞噬者', theme: 'minecraft', weight: 0.4, rarity: '神话', maxLv: 100, powerMultiplier: 1.8,
+    stages: [
+      { level: 1,   img: 'pet/pet-wither1.jpg', name: '带核凋零' },
+      { level: 15,  img: 'pet/pet-wither2.jpg', name: '装甲触手体' },
+      { level: 30,  img: 'pet/pet-wither3.jpg', name: '触手变异体' },
+      { level: 45,  img: 'pet/pet-wither4.jpg', name: '移动黑山脉' },
+      { level: 60,  img: 'pet/pet-wither5.jpg', name: '灾难毁灭者' },
+      { level: 80,  img: 'pet/pet-wither6.jpg', name: '九头分裂体' },
+      { level: 100, img: 'pet/pet-wither7.jpg', name: '最终吞噬者' }
+    ] 
+  },
 ];
 const petType = () => PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
 // 根据当前等级，获取对应的图片
