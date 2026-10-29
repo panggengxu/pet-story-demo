@@ -728,6 +728,15 @@ const PET_TYPES = [
       { level: 60, img: 'pet/pet-slime4.jpg', name: '下界熔岩史莱姆王' }
     ] 
   },
+    // 15. 🌌 虚空末影神（传说 / 4形态 / 100级满级 / 1.4倍战力）
+  { id: 'enderman', name: '虚空末影神', theme: 'minecraft', weight: 5, rarity: '传说', maxLv: 100, powerMultiplier: 1.4,
+    stages: [
+      { level: 1,  img: 'pet/pet-enderman1.jpg', name: '末影幼体' },
+      { level: 20, img: 'pet/pet-enderman2.jpg', name: '虚空行者' },
+      { level: 50, img: 'pet/pet-enderman3.jpg', name: '末地守卫' },
+      { level: 80, img: 'pet/pet-enderman4.jpg', name: '虚空末影神' }
+    ] 
+  },
 ];
 const petType = () => PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
 // 根据当前等级，获取对应的图片
