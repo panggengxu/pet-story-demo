@@ -1813,7 +1813,7 @@ saveSkills() {
       return el('div', { className: 'pool-item', style: 'align-items:center' },
         el('div', { style: 'display:flex; align-items:center; gap:8px' },
           el('img', { src: firstStage.img, style: 'width:36px; height:36px; object-fit:contain; border-radius:6px; background:var(--soft)' }),
-          el('span', { textContent: i.name })
+          el('span', { textContent: i.stages[0].name })
         ),
         el('span', { 
           textContent: `${prob}%`, 
