@@ -1476,6 +1476,41 @@ let currentTradeId = null;
 const ACTIONS = {
     setRankScope({ scope }) { currentRankScope = scope; renderRankingList(); },
   setRankMetric({ metric }) { currentRankMetric = metric; renderRankingList(); },
+    // 👇 新增：测试工具——打开自选宠物列表
+  tSelectPet() {
+    if (!isTest()) return;
+    const list = $('test-pet-list');
+    list.replaceChildren(...PET_TYPES.map(pt => {
+      return el('div', { 
+        className: 'inv-item', 
+        style: 'cursor:pointer; width:auto; padding:8px; border:1px solid var(--border); border-radius:10px; text-align:center',
+        onclick: () => ACTIONS.tAddSpecificPet({ id: pt.id })
+      },
+        el('img', { src: pt.stages[0].img, style: 'width:40px; height:40px; object-fit:contain; margin:0 auto' }),
+        el('div', { style: 'font-size:.7rem; font-weight:bold; margin-top:4px' }, pt.name),
+        el('div', { style: 'font-size:.6rem; color:var(--muted)' }, pt.theme)
+      );
+    }));
+    openModal('test-pet-modal');
+  },
+
+  // 👇 新增：测试工具——直接获得指定的宠物
+  tAddSpecificPet({ id }) {
+    if (!isTest()) return;
+    const e = { type: id, level: 1, pet: freshPet(70), equipped: emptyGear() };
+    
+    if (petCount() >= MAX_PETS) {
+      if (!state.warehouse) state.warehouse = [];
+      state.warehouse.push(e);
+      toast(`已获得【${PET_TYPES.find(t=>t.id===id).name}】，已放入仓库`);
+    } else {
+      const stored = state.petLevel > 0;
+      if (stored) state.box.push(e); else loadEntry(e);
+      toast(`已获得【${PET_TYPES.find(t=>t.id===id).name}】`);
+    }
+    closeModals();
+    render();
+  },
     // 【发起方】打开选宠界面
   tradePet({ id }) {
     const allMyPets = state.box.filter(p => !p.isActive);
@@ -2667,6 +2702,7 @@ function resetState() {
     el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
       btn('🔄 重置存档（回到刚开始）', 'tResetAll', {}, 'btn-action btn-gold'),
       btn('🥚 变回宠物蛋（重新抽宠物）', 'tEgg', {}),
+      btn('🐾 自选宠物（测试）', 'tSelectPet', {}, 'btn-action'),
       btn('🪙 +1000 金币', 'tCoins', {}),
       btn('⭐ +100 星星', 'tStars', {}),
       
@@ -2972,6 +3008,14 @@ render();
     <img id="anim-pet-right" style="position:absolute; right:0; top:50%; transform:translateY(-50%); width:100px; height:100px; object-fit:contain; transition:all 1s cubic-bezier(0.4, 0, 0.2, 1); z-index:2" src="">
     <div id="anim-flash" style="position:absolute; left:50%; top:50%; transform:translate(-50%, -50%) scale(0); font-size:4rem; opacity:0; transition:all 0.3s; z-index:3">💥</div>
     <div id="anim-text" style="position:absolute; bottom:20px; width:100%; text-align:center; color:#fff; font-weight:bold; font-size:1.5rem; opacity:0; transition:opacity 0.5s">交换成功！</div>
+  </div>
+</div>
+<!-- 测试专属：自选宠物弹窗 -->
+<div id="test-pet-modal" class="modal-overlay" role="dialog">
+  <div class="modal-box" style="text-align:left; width:min(500px, 95vw)">
+    <h3 style="color:var(--primary); margin-bottom:12px">🧪 自选宠物（测试专用）</h3>
+    <div id="test-pet-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(80px, 1fr)); gap:10px; max-height:400px; overflow-y:auto; padding:4px;"></div>
+    <button class="btn-action btn-block" style="margin-top:16px" data-action="close">关闭</button>
   </div>
 </div>
 </body>
