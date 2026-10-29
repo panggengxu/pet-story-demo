@@ -719,6 +719,15 @@ const PET_TYPES = [
       { level: 80, img: 'pet/pet-creeper4.jpg', name: '雷霆自爆核心' }  // 图4
     ] 
   },
+    // 14. 🟢 下界熔岩史莱姆王（普通 / 4形态 / 60级满级 / 1.0倍战力）
+  { id: 'slime', name: '下界熔岩史莱姆王', theme: 'minecraft', weight: 20, rarity: '普通', maxLv: 60, powerMultiplier: 1.0,
+    stages: [
+      { level: 1,  img: 'pet/pet-slime1.jpg', name: '幼年史莱姆' },
+      { level: 20, img: 'pet/pet-slime2.jpg', name: '野生史莱姆' },
+      { level: 40, img: 'pet/pet-slime3.jpg', name: '狂暴岩浆史莱姆' },
+      { level: 60, img: 'pet/pet-slime4.jpg', name: '下界熔岩史莱姆王' }
+    ] 
+  },
 ];
 const petType = () => PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
 // 根据当前等级，获取对应的图片
