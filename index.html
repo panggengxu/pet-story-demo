@@ -603,7 +603,7 @@ const SUBS = ['BC 华文', 'BM 马来文', 'BI 英文', 'MM 数学', 'SC 科学'
 // stages 是 Lv.1 / Lv.2 / Lv.3 的图片；只有一张图的品种，三个等级都显示这一张，以后补了图，在 stages 里按顺序加路径就行
 const PET_TYPES = [
   // 1. 🐲 末影龙（传说 / 3形态 / 100级满级 / 1.4倍战力）
-  { id: 'ender',  name: '末影龙',theme: 'minecraft', weight: 10, rarity: '传说', maxLv: 100, powerMultiplier: 1.4,
+  { id: 'ender',  name: '末影龙',theme: 'minecraft', weight: 1, rarity: '传说', maxLv: 100, powerMultiplier: 1.4,
     stages: [
       { level: 1,  img: 'pet/Ender dragon 1.jpg', name: '末影幼龙' },
       { level: 40, img: 'pet/Ender dragon 2.jpg', name: '觉醒末影龙' },
@@ -1827,7 +1827,7 @@ saveSkills() {
 
     // 4. 渲染列表
     list.replaceChildren(...pool.map(i => {
-      const prob = Math.round((i.weight / totalWeight) * 100);
+      const prob = ((i.weight / totalWeight) * 100).toFixed(1); // 👈 保留一位小数
       const firstStage = i.stages[0]; 
       return el('div', { className: 'pool-item', style: 'align-items:center' },
         el('div', { style: 'display:flex; align-items:center; gap:8px' },
