@@ -747,6 +747,15 @@ const PET_TYPES = [
       { level: 90, img: 'pet/pet-steve5.jpg', name: '下界合金创世神' }
     ] 
   },
+    // 17. 🪓 灾厄帝君（传说 / 4形态 / 80级满级 / 1.4倍战力）
+  { id: 'illager', name: '灾厄帝君', theme: 'minecraft', weight: 8, rarity: '传说', maxLv: 80, powerMultiplier: 1.4,
+    stages: [
+      { level: 1,  img: 'pet/pet-illager1.jpg', name: '卫道士' },
+      { level: 20, img: 'pet/pet-illager2.jpg', name: '唤魔者' },
+      { level: 50, img: 'pet/pet-illager3.jpg', name: '唤魔骑士' },
+      { level: 80, img: 'pet/pet-illager4.jpg', name: '灾厄帝君' }
+    ] 
+  },
 ];
 const petType = () => PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
 // 根据当前等级，获取对应的图片
