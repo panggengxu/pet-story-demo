@@ -737,6 +737,15 @@ const PET_TYPES = [
       { level: 80, img: 'pet/pet-enderman4.jpg', name: '虚空末影神' }
     ] 
   },
+    // 16. 👑 下界合金创世神（神话 / 4形态 / 100级满级 / 1.6倍战力）
+  { id: 'steve', name: '下界合金创世神', theme: 'minecraft', weight: 2, rarity: '神话', maxLv: 100, powerMultiplier: 1.6,
+    stages: [
+      { level: 1,  img: 'pet/pet-steve1.jpg', name: '新晋冒险家' },
+      { level: 20, img: 'pet/pet-steve2.jpg', name: '铁卫史蒂夫' },
+      { level: 50, img: 'pet/pet-steve3.jpg', name: '钻石战神' },
+      { level: 80, img: 'pet/pet-steve4.jpg', name: '下界合金创世神' }
+    ] 
+  },
 ];
 const petType = () => PET_TYPES.find(t => t.id === state.petType) || PET_TYPES[0];
 // 根据当前等级，获取对应的图片
