@@ -554,7 +554,7 @@ function render() {
         btn('捣蛋鬼', 'punishTalk', u.id, 'b ghost'),
         btn('欠作业罚', 'punishHomework', u.id, 'b red'),
         btn('违纪重罚', 'punishViolate', u.id, 'b red'),
-        btn('编辑', 'edit', u.id, 'b ghost'), btn('转班', 'move', u.id, 'b ghost'), btn('重置密码', 'reset', u.id, 'b ghost'), btn('删除', 'del', u.id, 'b red'))));
+        btn('编辑', 'edit', u.id, 'b ghost'), btn('转班', 'move', u.id, 'b ghost'), btn('重置密码', 'reset', u.id, 'b ghost'), btn('默认密码', 'resetDefaultPw', u.id, 'b red'), btn('删除', 'del', u.id, 'b red'))));
    });
 }
 
@@ -579,7 +579,7 @@ const A = {
       toast('未输入有效数值');
     }
   },
-  // 👇 一键惩罚：上课讲话
+  // 👇 一键惩罚：上课捣蛋
   punishTalk(id) {
     if (!confirm(`确定要对这位同学执行【捣蛋鬼】的惩罚吗？\n（扣除 50 金币）`)) return;
     award(id, -50, 0);
@@ -610,10 +610,13 @@ const A = {
     list.forEach(u => award(u.id, c, s)); render(); toast(`已发放给 ${list.length} 位学生`);
   },
   async add() {
-    const id = $('n-id').value.trim(), name = $('n-name').value.trim(), pw = $('n-pw').value;
-    const gender = $('n-gender').value; // 👉 抓取選擇的性別 (M 或 F)
+    const id = $('n-id').value.trim(), name = $('n-name').value.trim();
+    const gender = $('n-gender').value; 
     if (!/^[A-Za-z0-9_-]{2,20}$/.test(id)) return toast('学号只能是 2-20 位字母、数字、- 或 _');
     if (!name) return toast('请填写姓名');
+    
+    // 👇 核心修改：如果老师留空，自动把密码设为“学号+pets”
+    const pw = $('n-pw').value.trim() || (id + 'pets');
     if (pw.length < 6) return toast('密码至少 6 位');
     if (!curClass) return toast('请先选择班级（没有班级请让管理员先创建）');
     if (!/^p\d{5}$/.test(id.toLowerCase()) && !confirm('学号不是推荐格式：p + 入学年份后两位 + 3 位序号（例如 p26001）。\n仍然用这个学号添加吗？')) return;
@@ -743,13 +746,24 @@ const A = {
     try { await Auth.call('deleteUser', { code: id }); } catch (e) { return toast('删除失败：' + e.message); }
     render(); toast('已删除');
   },
+    async resetDefaultPw(id) {
+    if (!confirm(`确定要把 ${id} 的密码一键重置为默认密码【${id}pets】吗？`)) return;
+    try {
+      await Auth.call('resetPassword', { code: id, password: id.toLowerCase() + 'pets' });
+    } catch (e) { 
+      return toast('重置失败：' + e.message); 
+    }
+    toast(`密码已重置为：${id.toLowerCase()}pets`);
+  },
   async reset(id) {
+    
     const pw = prompt('输入新密码（至少 6 位）');
     if (pw === null) return;
     if (pw.length < 6) return toast('密码至少 6 位');
     try { await Auth.call('resetPassword', { code: id, password: pw }); } catch (e) { return toast('重置失败：' + e.message); }
     toast('密码已重置');
   },
+  
   async del(id) {
     const u = Auth.users().find(x => x.id === id);
     if (!confirm(`确定删除 ${u.name}（${id}）？该学生的账号会被删除，无法恢复。`)) return;
