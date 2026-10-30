@@ -121,6 +121,21 @@ details.card[open] summary::before { transform: rotate(90deg); }
     left: 0;
   }
 }
+/* 👇 智能下拉菜单专属样式 👇 */
+.dropdown-menu {
+  position: fixed; /* 让它脱离表格的滚动条限制 */
+  background: #fff;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  border-radius: 10px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 9999;
+  min-width: 145px;
+  text-align: left;
+}
 </style>
 </head>
 <body>
@@ -626,7 +641,7 @@ function render() {
         // 👇 用 details 标签做一个原生下拉菜单 👇
         el('details', { style: 'display:inline-block; position:relative;' },
           el('summary', { className: 'b ghost', style: 'list-style:none; cursor:pointer; user-select:none; display:inline-block; margin:0;' }, '更多 ▾'),
-          el('div', { style: 'position:absolute; right:0; top:100%; background:#fff; border:1px solid var(--border); box-shadow:0 8px 24px rgba(0,0,0,0.12); border-radius:10px; padding:8px; display:flex; flex-direction:column; gap:6px; z-index:999; min-width:135px; text-align:left;' },
+          el('div', { className: 'dropdown-menu' },
             btn('欠作业罚 (-100🪙)', 'punishHomework', u.id, 'b red'),
             btn('违纪重罚 (-200🪙)', 'punishViolate', u.id, 'b red'),
             el('hr', {style: 'border:0; border-top:1px solid var(--border); margin:4px 0;'}),
@@ -959,6 +974,34 @@ function render() {
   }
 };
 
+// 👇 智能计算下拉菜单位置，防止超出屏幕或被截断 (进阶版)
+document.addEventListener('toggle', e => {
+  if (e.target.tagName === 'DETAILS' && e.target.open) {
+    const btn = e.target.querySelector('summary');
+    const menu = e.target.querySelector('.dropdown-menu');
+    if (!btn || !menu) return;
+    
+    // 使用 requestAnimationFrame 确保菜单已经渲染出来，能拿到真实高度
+    requestAnimationFrame(() => {
+      const rect = btn.getBoundingClientRect();
+      
+      // 默认：向下展开，右侧对齐
+      let topPos = rect.bottom + 5;
+      let leftPos = rect.right - 145; 
+      
+      // 如果下方空间不足 300px，则变成向上展开
+      if (window.innerHeight - rect.bottom < 300) {
+        topPos = rect.top - menu.offsetHeight - 5;
+        if (topPos < 10) topPos = 10; 
+      }
+      
+      menu.style.top = topPos + 'px';
+      menu.style.left = Math.max(10, leftPos) + 'px'; 
+    });
+  }
+}, true);
+
+// 👇 全局点击事件：处理空白处收起、按钮点击
 document.addEventListener('click', e => {
   // 1. 如果点击的地方不是 details 内部，就自动关闭所有下拉菜单（点击空白处收起）
   if (!e.target.closest('details')) {
@@ -975,6 +1018,11 @@ document.addEventListener('click', e => {
     A[t.dataset.a]?.(t.dataset.id);
   }
 });
+
+// 👇 新增：为了防止 fixed 菜单在滚动时“飘”在屏幕中间，一旦滚动就自动收起菜单
+document.addEventListener('scroll', () => {
+  document.querySelectorAll('details[open]').forEach(d => d.removeAttribute('open'));
+}, true); // 这里用 true 捕获滚动，不管是表格滚动还是整页滚动都能监听到
 window.addEventListener('storage', render);               // 学生在别的标签页打卡时，这里自动刷新
 
 $('me').textContent = me.name;
