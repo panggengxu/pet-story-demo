@@ -447,14 +447,41 @@ function render() {
       el('td', { textContent: `${d.stars ?? Auth.START.stars}${pa && pa.stars ? `（待领 ${pa.stars > 0 ? '+' : ''}${pa.stars}）` : ''}` }),
       el('td', { textContent: `${done} / 5` }),
       el('td', { className: 'act' },
-        btn('+金币', 'coin', u.id, 'b gold'), btn('+星星', 'star', u.id, 'b gold'),
+        btn('修改金币', 'coin', u.id, 'b gold'), 
+        btn('讲话罚', 'punishTalk', u.id, 'b ghost'),
+        btn('欠作业罚', 'punishHomework', u.id, 'b red'),
+        btn('违纪重罚', 'punishViolate', u.id, 'b red'),
         btn('编辑', 'edit', u.id, 'b ghost'), btn('转班', 'move', u.id, 'b ghost'), btn('重置密码', 'reset', u.id, 'b ghost'), btn('删除', 'del', u.id, 'b red'))));
-  });
+   });
 }
 
 const A = {
   logout: Auth.logout,
   coin(id) { const n = askNum('发放多少金币？（负数为扣除）'); if (n) { award(id, n, 0); render(); toast('已更新金币'); } },
+  // 👇 一键惩罚：上课讲话
+  punishTalk(id) {
+    if (!confirm(`确定要对这位同学执行【上课讲话】的惩罚吗？\n（扣除 50 金币）`)) return;
+    award(id, -50, 0);
+    toast('已扣除 50 金币（上课讲话）');
+    render();
+  },
+
+  // 👇 一键惩罚：没做功课 / 默写
+  punishHomework(id) {
+    if (!confirm(`确定要对这位同学执行【欠交作业】的惩罚吗？\n（扣除 100 金币，扣除 100 经验）`)) return;
+    award(id, -100, 0); // 扣金币
+    Auth.grant(id, 0, 0, '未完成作业惩罚', -100); // 扣经验
+    toast('已扣除 100 金币和 100 经验（欠交作业）');
+    render();
+  },
+
+  // 👇 一键重罚：不尊重老师 / 严重违纪
+  punishViolate(id) {
+    if (!confirm(`确定要对这位同学执行【违纪重罚】吗？\n（扣除 200 金币，扣除 50 星星）`)) return;
+    award(id, -200, -50); // 扣金币和星星
+    toast('已扣除 200 金币和 50 星星（违纪）');
+    render();
+  },
   star(id) { const n = askNum('发放多少星星？（负数为扣除）'); if (n) { award(id, 0, n); render(); toast('已更新星星'); } },
   awardAll() {
     const c = parseInt($('a-coins').value, 10) || 0, s = parseInt($('a-stars').value, 10) || 0, list = students();
