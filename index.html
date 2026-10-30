@@ -1155,7 +1155,13 @@ function renderHall() {
   const box = $('hof-box');
   if (!box) return;
   box.replaceChildren();
-  const uid = Auth.users().find(u => u.id === me.id)?.uid, all = Auth.hall().filter(e => e.subject === hofSubj);
+const uid = Auth.users().find(u => u.id === me.id)?.uid;
+// 👇 过滤掉测试号的成绩
+const all = Auth.hall().filter(e => {
+  if (e.subject !== hofSubj) return false;
+  if (e.studentId && e.studentId.toLowerCase().startsWith('test')) return false;
+  return true;
+});
   const group = list => {
     const m = new Map();
     list.forEach(e => { const k = e.studentId || e.name.trim().toLowerCase(); if (!m.has(k) || e.score > m.get(k).score) m.set(k, e); });
@@ -1379,6 +1385,20 @@ async function renderRankingList() {
     } else {
       $('rk-rank-info').textContent = `暂未上榜`;
     }
+
+    // 👇 新增：过滤掉测试号和测试班的学生，不让他们上榜
+    const cleanDbList = dbList.filter(u => {
+      if (!u.code) return true;
+      const isTestCode = u.code.toLowerCase().startsWith('test');
+      const isTestClass = u.class_name && u.class_name.toLowerCase().includes('test');
+      return !isTestCode && !isTestClass;
+    });
+
+// 然后把原来的 dbList 换成 cleanDbList
+let candidates = cleanDbList.map(u => ({
+  name: u.name + (u.code === me.id ? '（我）' : ''),
+  // ... 下面保持不变 ...
+}));
 
     let candidates = dbList.map(u => ({
       name: u.name + (u.code === me.id ? '（我）' : ''),
