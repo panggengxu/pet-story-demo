@@ -332,6 +332,13 @@ function renderAdmin() {
 }
 const today = () => new Date().toLocaleDateString('sv');
 const PETS = ['未孵化 🥚', 'Lv.1', 'Lv.2', 'Lv.3 👑'];
+const PET_NAMES = {
+  'ender': '末影龙', 'labubu': '草莓战士', 'sky': '天空系飞熊', 'cosmic': '星空猫咪',
+  'fire': '炎系小火龙', 'shadow': '暗影雷狼', 'plant': '萝卜兔', 'whale': '幻海神鲸',
+  'dragon': '太初神龙', 'zombie': '僵尸', 'skeleton': '地狱骨王', 'spider': '盘丝蛛后',
+  'creeper': '雷霆自爆核心', 'slime': '下界熔岩史莱姆王', 'enderman': '虚空末影神',
+  'steve': '下界合金创世神', 'illager': '灾厄帝君', 'wither': '最终吞噬者'
+};
 
 // 发放金币/星星：写入“奖励记录”，学生下次打开游戏页面时自动领取（不会和学生的存档互相覆盖）
 function award(id, c, s, note) { Auth.grant(id, c, s, note || ''); }
@@ -452,7 +459,7 @@ function render() {
     const rec = Auth.records(), done = Auth.SUBJECTS.filter(sj => (rec[`${today()}|${Auth.CHECKIN}|${sj}`] || []).includes(u.id)).length;
     body.append(el('tr', {},
       el('td', { textContent: `[${u.gender || 'M'}] ${u.name}（${u.id}${gradeOf(u.id) ? '·' + gradeOf(u.id) : ''}）` }),
-      el('td', { textContent: PETS[d.petLevel || 0] || '-' }),
+      el('td', { textContent: d.petLevel > 0 ? `${PET_NAMES[d.petType] || '未知宠物'} Lv.${d.petLevel}` : '未孵化 🥚' }),
       el('td', { textContent: `${d.coins ?? Auth.START.coins}${pa && pa.coins ? `（待领 ${pa.coins > 0 ? '+' : ''}${pa.coins}）` : ''}` }),
       el('td', { textContent: `${d.stars ?? Auth.START.stars}${pa && pa.stars ? `（待领 ${pa.stars > 0 ? '+' : ''}${pa.stars}）` : ''}` }),
       el('td', { textContent: `${done} / 5` }),
