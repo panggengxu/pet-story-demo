@@ -465,7 +465,7 @@ function render() {
       el('td', { textContent: `${done} / 5` }),
       el('td', { className: 'act' },
         btn('修改金币', 'coin', u.id, 'b gold'), 
-        btn('讲话罚', 'punishTalk', u.id, 'b ghost'),
+        btn('捣蛋鬼', 'punishTalk', u.id, 'b ghost'),
         btn('欠作业罚', 'punishHomework', u.id, 'b red'),
         btn('违纪重罚', 'punishViolate', u.id, 'b red'),
         btn('编辑', 'edit', u.id, 'b ghost'), btn('转班', 'move', u.id, 'b ghost'), btn('重置密码', 'reset', u.id, 'b ghost'), btn('删除', 'del', u.id, 'b red'))));
@@ -477,9 +477,9 @@ const A = {
   coin(id) { const n = askNum('发放多少金币？（负数为扣除）'); if (n) { award(id, n, 0); render(); toast('已更新金币'); } },
   // 👇 一键惩罚：上课讲话
   punishTalk(id) {
-    if (!confirm(`确定要对这位同学执行【上课讲话】的惩罚吗？\n（扣除 50 金币）`)) return;
+    if (!confirm(`确定要对这位同学执行【捣蛋鬼】的惩罚吗？\n（扣除 50 金币）`)) return;
     award(id, -50, 0);
-    toast('已扣除 50 金币（上课讲话）');
+    toast('已扣除 50 金币（上课捣蛋）');
     render();
   },
 
