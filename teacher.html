@@ -464,7 +464,7 @@ function render() {
       el('td', { textContent: `${d.stars ?? Auth.START.stars}${pa && pa.stars ? `（待领 ${pa.stars > 0 ? '+' : ''}${pa.stars}）` : ''}` }),
       el('td', { textContent: `${done} / 5` }),
       el('td', { className: 'act' },
-        btn('修改金币', 'coin', u.id, 'b gold'), 
+        btn('修改奖励', 'modifyRewards', u.id, 'b gold'), 
         btn('捣蛋鬼', 'punishTalk', u.id, 'b ghost'),
         btn('欠作业罚', 'punishHomework', u.id, 'b red'),
         btn('违纪重罚', 'punishViolate', u.id, 'b red'),
@@ -475,6 +475,24 @@ function render() {
 const A = {
   logout: Auth.logout,
   coin(id) { const n = askNum('发放多少金币？（负数为扣除）'); if (n) { award(id, n, 0); render(); toast('已更新金币'); } },
+  // 👇 新增：一键同时修改金币和星星
+  modifyRewards(id) {
+    const input = prompt('请输入要修改的数值，格式为：金币,星星\n（正数为增加，负数为扣除）\n例如：100,10 或 -50,-5');
+    if (!input) return;
+  
+    // 👇 兼容中文逗号和英文逗号
+    const parts = input.replace('，', ',').split(',');
+    const c = parseInt(parts[0], 10) || 0;
+    const s = parseInt(parts[1], 10) || 0;
+  
+    if (c !== 0 || s !== 0) {
+      award(id, c, s);
+      toast(`已处理：${c > 0 ? '+' : ''}${c} 金币，${s > 0 ? '+' : ''}${s} 星星`);
+      render();
+    } else {
+      toast('未输入有效数值');
+    }
+  },
   // 👇 一键惩罚：上课讲话
   punishTalk(id) {
     if (!confirm(`确定要对这位同学执行【捣蛋鬼】的惩罚吗？\n（扣除 50 金币）`)) return;
