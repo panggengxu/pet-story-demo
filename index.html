@@ -235,6 +235,8 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
             <div class="stat">🪙 金币: <strong id="coins">0</strong></div>
             <div class="stat">⭐ 星星: <strong id="stars">0</strong></div>
           </div>
+          <button id="teacher-daily-btn" class="btn-action btn-gold btn-block" style="display:none; margin-top:10px;" data-action="claimTeacherDaily">👩‍🏫 领取教师专属每日津贴（5000金币 + 500经验）</button>
+        </div>
         </div>
         <div class="card">
           <div class="card-title">NOTICE BOARD</div>
@@ -458,6 +460,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
           <button class="rank-tab-btn" data-action="setRankMetric" data-metric="single">⚡ 最强单体</button>
         </div>
       </div>
+      <div id="teacher-god-card" style="display:none;"></div>
 
       <div id="rank-list"></div>
     </div>
@@ -1428,30 +1431,77 @@ async function renderRankingList() {
       $('rk-rank-info').textContent = `暂未上榜`;
     }
 
-    // 👇 新增：过滤掉测试号和测试班的学生，不让他们上榜
+    // ===== 1. 分离教师与学生 =====
+    // 找出最强老师
+    const teacherList = dbList.filter(u => u.code && u.code.toLowerCase().startsWith('teacher'));
+    let topTeacher = null;
+    if (teacherList.length > 0) {
+      teacherList.sort((a, b) => {
+        const valA = currentRankMetric === 'total' ? a.total_power : a.max_power;
+        const valB = currentRankMetric === 'total' ? b.total_power : b.max_power;
+        return (valB || 0) - (valA || 0);
+      });
+      topTeacher = teacherList[0];
+    }
+
+    // 学生榜：过滤掉 test 号 和 teacher 号
     const cleanDbList = dbList.filter(u => {
       if (!u.code) return true;
-      const isTestCode = u.code.toLowerCase().startsWith('test');
+      const code = u.code.toLowerCase();
+      const isTestCode = code.startsWith('test');
       const isTestClass = u.class_name && u.class_name.toLowerCase().includes('test');
-      return !isTestCode && !isTestClass;
+      const isTeacher = code.startsWith('teacher');
+      return !isTestCode && !isTestClass && !isTeacher;
     });
 
-// 然后把原来的 dbList 换成 cleanDbList
-let candidates = cleanDbList.map(u => ({
-  name: u.name + (u.code === me.id ? '（我）' : ''),
-  cls: u.class_name,
-  totalPower: u.total_power || 0,
-  maxPower: u.max_power || 0,
-  isFriend: u.is_friend,
-  me: u.code === me.id,
-  other: u.user_id,
-  rawSave: u.save_data
-}));
+    // ===== 2. 渲染最强教师卡片 =====
+    const teacherBox = $('teacher-god-card');
+    if (teacherBox) {
+      if (topTeacher) {
+        const power = currentRankMetric === 'total' ? topTeacher.total_power : topTeacher.max_power;
+        const label = currentRankMetric === 'total' ? '全队总战力' : '单体最高';
+        teacherBox.style.display = 'block';
+        teacherBox.innerHTML = `
+          <div style="background:linear-gradient(135deg, #4318ff, #9d4edd); color:white; padding:16px; border-radius:16px; margin-bottom:16px; box-shadow:0 4px 15px rgba(67,24,255,0.3); display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:.8rem; opacity:.8; margin-bottom:4px;">👑 补习中心大魔王 (最强教师)</div>
+              <div style="font-size:1.2rem; font-weight:bold;">${topTeacher.name} 老师</div>
+              <div style="font-size:1.4rem; font-weight:900; margin-top:4px;">${power || 0} <span style="font-size:.9rem">Pt (${label})</span></div>
+            </div>
+            <button class="btn-action btn-gold" style="padding:8px 12px; border-radius:10px;" data-action="inspectTeacher" data-id="${topTeacher.user_id}">🔍 瞻仰阵容</button>
+          </div>
+        `;
+      } else {
+        teacherBox.style.display = 'none';
+      }
+    }
+
+    // 生成学生榜单候选人 (原来的逻辑)
+    let candidates = cleanDbList.map(u => ({
+      name: u.name + (u.code === me.id ? '（我）' : ''),
+      cls: u.class_name,
+      totalPower: u.total_power || 0,
+      maxPower: u.max_power || 0,
+      isFriend: u.is_friend,
+      me: u.code === me.id,
+      other: u.user_id,
+      rawSave: u.save_data
+    }));
     
     // 排序
     candidates.sort((a, b) => currentRankMetric === 'total' ? (b.totalPower - a.totalPower) : (b.maxPower - a.maxPower));
 
-        window.currentCandidates = candidates;
+            // 把学生榜和老师榜合在一起存到全局变量里，这样点击【瞻仰阵容】就能识别到了
+    const allCandidatesForModal = [...candidates];
+    if (topTeacher) {
+      allCandidatesForModal.push({
+        name: topTeacher.name + ' (老师)',
+        me: false,
+        other: topTeacher.user_id,
+        rawSave: topTeacher.save_data
+      });
+    }
+    window.currentCandidates = allCandidatesForModal;
     // 渲染列表
     listBox.replaceChildren(...candidates.map((r, i) => {
       const val = currentRankMetric === 'total' ? r.totalPower : r.maxPower;
@@ -1534,6 +1584,10 @@ const ACTIONS = {
     setRankScope({ scope }) { currentRankScope = scope; renderRankingList(); },
   setRankMetric({ metric }) { currentRankMetric = metric; renderRankingList(); },
   setHofScope({ scope }) { hofScope = scope; renderHall(); },
+
+  inspectTeacher({ id }) {
+    ACTIONS.inspectTeam({ id: id }); 
+  },
     // 👇 新增：测试工具——打开自选宠物列表
   tSelectPet() {
     if (!isTest()) return;
@@ -1692,6 +1746,18 @@ const ACTIONS = {
       }, 2800);
     });
   },
+
+    inspectTeacher({ id }) {
+    const row = window.currentCandidates?.find(c => c.other === id);
+    if (row) {
+       ACTIONS.inspectTeam({ id }); // 直接复用原有的查看阵容逻辑
+    } else {
+       // 如果在学生列表里没找到（因为老师被单独剔除了），用数据库里的数据临时渲染
+       // 因为现有的 inspectTeam 依赖 currentCandidates，为了最稳，我们这里直接手动触发。
+       // 实际上，为了避免大改，你可以在 renderRankingList 里顺便把 topTeacher 也塞进 window.currentCandidates 里。
+    }
+  }
+  
   inspectTeam({ id }) {
     let targetName = '';
     let targetPets = [];
