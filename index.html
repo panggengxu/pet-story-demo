@@ -1167,10 +1167,9 @@ const myClassId = Auth.users().find(u => u.id === me.id)?.classId;
 // 👇 更新全中心/班级按钮的高亮状态
 document.querySelectorAll('[data-action="setHofScope"]').forEach(b => b.classList.toggle('active', b.dataset.scope === hofScope));
 
-// 👇 过滤数据（过滤测试号 + 过滤班级）
+// 👇 过滤数据（只保留科目判定和班级判定）
 const all = Auth.hall().filter(e => {
   if (e.subject !== hofSubj) return false;
-  if (e.studentId && e.studentId.toLowerCase().startsWith('test')) return false;
   
   // 如果点击了“我的班级”，则只保留同班同学
   if (hofScope === 'class') {
