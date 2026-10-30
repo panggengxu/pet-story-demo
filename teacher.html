@@ -549,13 +549,24 @@ function render() {
       el('td', { textContent: `${d.coins ?? Auth.START.coins}${pa && pa.coins ? `（待领 ${pa.coins > 0 ? '+' : ''}${pa.coins}）` : ''}` }),
       el('td', { textContent: `${d.stars ?? Auth.START.stars}${pa && pa.stars ? `（待领 ${pa.stars > 0 ? '+' : ''}${pa.stars}）` : ''}` }),
       el('td', { textContent: `${done} / 5` }),
-      el('td', { className: 'act' },
-        btn('修改奖励', 'modifyRewards', u.id, 'b gold'), 
-        btn('捣蛋鬼', 'punishTalk', u.id, 'b ghost'),
-        btn('欠作业罚', 'punishHomework', u.id, 'b red'),
-        btn('违纪重罚', 'punishViolate', u.id, 'b red'),
-        btn('编辑', 'edit', u.id, 'b ghost'), btn('转班', 'move', u.id, 'b ghost'), btn('重置密码', 'reset', u.id, 'b ghost'), btn('默认密码', 'resetDefaultPw', u.id, 'b red'), btn('删除', 'del', u.id, 'b red'))));
-   });
+      el('td', { className: 'act', style: 'position:relative;align-items:center;' },
+        btn('奖励', 'modifyRewards', u.id, 'b gold'), 
+        btn('捣蛋鬼', 'punishTalk', u.id, 'b ghost'), // 👈 上课讲话很常用，留在外面
+        // 👇 用 details 标签做一个原生下拉菜单 👇
+        el('details', { style: 'display:inline-block; position:relative;' },
+          el('summary', { className: 'b ghost', style: 'list-style:none; cursor:pointer; user-select:none; display:inline-block; margin:0;' }, '更多 ▾'),
+          el('div', { style: 'position:absolute; right:0; top:100%; background:#fff; border:1px solid var(--border); box-shadow:0 8px 24px rgba(0,0,0,0.12); border-radius:10px; padding:8px; display:flex; flex-direction:column; gap:6px; z-index:999; min-width:135px; text-align:left;' },
+            btn('欠作业罚 (-100🪙)', 'punishHomework', u.id, 'b red'),
+            btn('违纪重罚 (-200🪙)', 'punishViolate', u.id, 'b red'),
+            el('hr', {style: 'border:0; border-top:1px solid var(--border); margin:4px 0;'}),
+            btn('编辑资料', 'edit', u.id, 'b ghost'), 
+            btn('转班', 'move', u.id, 'b ghost'), 
+            btn('设为默认密码', 'resetDefaultPw', u.id, 'b ghost'), // 👈 默认密码放这里
+            btn('手动改密', 'reset', u.id, 'b ghost'), 
+            btn('删除学生', 'del', u.id, 'b red')
+          )
+        )
+      ));
 }
 
 const A = {
@@ -877,8 +888,20 @@ const A = {
 };
 
 document.addEventListener('click', e => {
+  // 1. 如果点击的地方不是 details 内部，就自动关闭所有下拉菜单（点击空白处收起）
+  if (!e.target.closest('details')) {
+    document.querySelectorAll('details[open]').forEach(d => d.removeAttribute('open'));
+  }
+
+  // 2. 处理按钮点击
   const t = e.target.closest('[data-a]');
-  if (t) A[t.dataset.a]?.(t.dataset.id);
+  if (t) {
+    // 如果点的是下拉菜单里的按钮，点完自动收起菜单
+    const parentDetails = t.closest('details');
+    if (parentDetails) parentDetails.removeAttribute('open');
+    
+    A[t.dataset.a]?.(t.dataset.id);
+  }
 });
 window.addEventListener('storage', render);               // 学生在别的标签页打卡时，这里自动刷新
 
