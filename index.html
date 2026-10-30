@@ -952,7 +952,12 @@ function renderWarehouse() {
       el('img', { src: petImageOf(e), style: 'width:100%; height:100px; object-fit:contain; background:var(--soft); border-radius:10px; margin-bottom:8px' }),
       el('div', { style: 'font-weight:bold; font-size:.9rem' }, petStageName(e.type, e.level)),
       el('div', { className: 'hint', style: 'margin-bottom:8px' }, `Lv.${e.level} · 战力 ${calcSinglePetPower(e)}`),
-      btn('调出到收纳箱', 'swapWarehouse', { id: i }, 'btn-action btn-block')
+    
+      // 👇 把原来的单一按钮换成两个并排的按钮 👇
+      el('div', { style: 'display:flex; gap:8px; width:100%' },
+        btn('调出', 'swapWarehouse', { id: i }, 'btn-action btn-block', { style: 'flex:1; padding:6px; font-size:.75rem' }),
+        btn('放生', 'releasePet', { id: i, from: 'warehouse' }, 'unequip', { style: 'flex:1; border:1px solid #d33; border-radius:8px; text-align:center; padding:6px; font-size:.75rem' })
+      )
     ));
   });
 }
@@ -1990,14 +1995,31 @@ toWarehouse({ id }) {
     state.box.push(activeAsEntry()); emptyActive();
     render(); toast('已把宠物收进收纳箱，随时可以让它出战');
   },
-  releasePet({ id }) {                                     // 放生：释放名额，配件回到背包
-    const isActive = id === 'active', e = isActive ? activeAsEntry() : state.box[+id];
+  releasePet({ id, from }) {
+    let e;
+    if (from === 'warehouse') {
+      e = state.warehouse[+id]; // 👈 从仓库取
+    } else {
+      e = id === 'active' ? activeAsEntry() : state.box[+id]; // 原来收纳箱和出战逻辑
+    }
+  
     if (!e) return;
     const name = petStageName(e.type, e.level);
+  
     if (!confirm(`确定放生「${name}」（Lv.${e.level}）吗？放生后找不回来，它身上的配件会回到背包。`)) return;
-    returnGear(e.equipped);
-    if (isActive) emptyActive(); else state.box.splice(+id, 1);
-    render(); toast(`已放生「${name}」`);
+  
+    returnGear(e.equipped); // 身上的装备退回背包
+  
+    if (from === 'warehouse') {
+      state.warehouse.splice(+id, 1); // 👈 从仓库删除
+    } else if (id === 'active') {
+      emptyActive();
+    } else {
+      state.box.splice(+id, 1);
+    }
+  
+    render(); 
+    toast(`已放生「${name}」`);
   },
   evolve() {
     if (state.petLevel < 1) return;
