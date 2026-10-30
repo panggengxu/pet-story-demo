@@ -786,7 +786,7 @@ $('me').textContent = me.name;
 $('r-date').value = today(); $('r-date').onchange = async () => { await Auth.loadDay(rState().d); renderRoster(); };   // 切换日期时载入那天的记录
 $('r-kind').onchange = renderRoster;
 Auth.SUBJECTS.forEach(x => { $('t-subj').append(new Option(x, x)); $('t-filter').append(new Option(x, x)); });
-['总分', ...Auth.SUBJECTS].forEach(x => { $('h-subj').append(new Option(x, x)); $('hf-subj').append(new Option(x, x)); });
+Auth.SUBJECTS.forEach(x => { $('h-subj').append(new Option(x, x)); $('hf-subj').append(new Option(x, x)); });
 $('hf-subj').onchange = renderHall;
 $('h-who').onchange = () => {                              // 选了在校学生就自动填姓名和班别
   const u = Auth.users().find(x => x.id === $('h-who').value);
