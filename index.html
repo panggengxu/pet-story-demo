@@ -393,7 +393,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
     <div class="card-title">PET WAREHOUSE</div>
     <div class="card-heading">🏠 宠物仓库</div>
     <div class="hint" style="margin-bottom:12px">你最多可以带 6 只宠物出战/收纳。超过 6 只的宠物会存放在这里。</div>
-    <div id="warehouse-list" style="display:flex; flex-wrap:wrap; gap:12px;"></div>
+    <div id="warehouse-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); gap:10px;"></div>
   </div>
 </div>
 
@@ -948,17 +948,23 @@ function renderWarehouse() {
   }
   state.warehouse.forEach((e, i) => {
     const pt = PET_TYPES.find(t => t.id === e.type) || PET_TYPES[0];
-    box.append(el('div', { className: 'team-item-card', style: 'flex-direction:column; align-items:flex-start; width:160px; padding:12px' },
-      el('img', { src: petImageOf(e), style: 'width:100%; height:100px; object-fit:contain; background:var(--soft); border-radius:10px; margin-bottom:8px' }),
-      el('div', { style: 'font-weight:bold; font-size:.9rem' }, petStageName(e.type, e.level)),
-      el('div', { className: 'hint', style: 'margin-bottom:8px' }, `Lv.${e.level} · 战力 ${calcSinglePetPower(e)}`),
+    box.append(el('div', { className: 'team-item-card', style: 'flex-direction:column; align-items:center; width:100%; padding:10px 6px; margin:0; box-sizing:border-box' },
     
-      // 👇 把原来的单一按钮换成两个并排的按钮 👇
-      el('div', { style: 'display:flex; gap:8px; width:100%' },
-        btn('调出', 'swapWarehouse', { id: i }, 'btn-action btn-block', { style: 'flex:1; padding:6px; font-size:.75rem' }),
-        btn('放生', 'releasePet', { id: i, from: 'warehouse' }, 'unequip', { style: 'flex:1; border:1px solid #d33; border-radius:8px; text-align:center; padding:6px; font-size:.75rem' })
+      // 图片高度稍微缩小一点，适应小卡片
+      el('img', { src: petImageOf(e), style: 'width:100%; height:80px; object-fit:contain; background:var(--soft); border-radius:10px; margin-bottom:6px' }),
+    
+      // 名字字号调小，且居中
+      el('div', { style: 'font-weight:bold; font-size:.8rem; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%' }, petStageName(e.type, e.level)),
+    
+      el('div', { className: 'hint', style: 'margin-bottom:8px; font-size:.65rem' }, `Lv.${e.level} · 战力 ${calcSinglePetPower(e)}`),
+    
+      // 按钮调小，并排
+      el('div', { style: 'display:flex; gap:4px; width:100%' },
+        btn('调出', 'swapWarehouse', { id: i }, 'btn-action btn-block', { style: 'flex:1; padding:4px 0; font-size:.7rem' }),
+        btn('放生', 'releasePet', { id: i, from: 'warehouse' }, 'unequip', { style: 'flex:1; border:1px solid #d33; border-radius:8px; text-align:center; padding:4px 0; font-size:.7rem; box-sizing:border-box' })
       )
     ));
+  });
   });
 }
   
