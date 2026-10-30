@@ -1454,23 +1454,39 @@ async function renderRankingList() {
       return !isTestCode && !isTestClass && !isTeacher;
     });
 
-    // ===== 2. 渲染最强教师卡片 =====
+    // ===== 2. 渲染最强教师卡片（支持展示前 3 名） =====
     const teacherBox = $('teacher-god-card');
     if (teacherBox) {
-      if (topTeacher) {
-        const power = currentRankMetric === 'total' ? topTeacher.total_power : topTeacher.max_power;
-        const label = currentRankMetric === 'total' ? '全队总战力' : '单体最高';
+      if (teacherList && teacherList.length > 0) {
         teacherBox.style.display = 'block';
-        teacherBox.innerHTML = `
-          <div style="background:linear-gradient(135deg, #4318ff, #9d4edd); color:white; padding:16px; border-radius:16px; margin-bottom:16px; box-shadow:0 4px 15px rgba(67,24,255,0.3); display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <div style="font-size:.8rem; opacity:.8; margin-bottom:4px;">👑 补习中心大魔王 (最强教师)</div>
-              <div style="font-size:1.2rem; font-weight:bold;">${topTeacher.name} 老师</div>
-              <div style="font-size:1.4rem; font-weight:900; margin-top:4px;">${power || 0} <span style="font-size:.9rem">Pt (${label})</span></div>
+        
+        // 取出战力最高的前 3 名老师
+        const top3Teachers = teacherList.slice(0, 3);
+        
+        let html = `<div style="background:linear-gradient(135deg, #4318ff, #9d4edd); color:white; padding:16px; border-radius:16px; margin-bottom:16px; box-shadow:0 4px 15px rgba(67,24,255,0.3);">`;
+        html += `<div style="font-size:.8rem; opacity:.8; margin-bottom:12px; font-weight:bold;">👑 补习中心大魔王阵营 (教师天团)</div>`;
+        
+        top3Teachers.forEach((t, idx) => {
+          const power = currentRankMetric === 'total' ? t.total_power : t.max_power;
+          const label = currentRankMetric === 'total' ? '总战力' : '单体最高';
+          html += `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed rgba(255,255,255,0.2);">
+              <div>
+                <div style="font-size:1.1rem; font-weight:bold;">${['🥇','🥈','🥉'][idx] || (idx+1)+'.'} ${t.name} 老师</div>
+                <div style="font-size:1.2rem; font-weight:900;">${power || 0} <span style="font-size:.8rem">Pt (${label})</span></div>
+              </div>
+              <button class="btn-action btn-gold" style="padding:6px 10px; border-radius:8px; font-size:0.75rem;" data-action="inspectTeacher" data-id="${t.user_id}">🔍 瞻仰</button>
             </div>
-            <button class="btn-action btn-gold" style="padding:8px 12px; border-radius:10px;" data-action="inspectTeacher" data-id="${topTeacher.user_id}">🔍 瞻仰阵容</button>
-          </div>
-        `;
+          `;
+        });
+        
+        // 如果还有更多老师，显示一个小提示
+        if (teacherList.length > 3) {
+           html += `<div style="font-size:.75rem; opacity:.7; text-align:center; margin-top:4px;">...还有 ${teacherList.length - 3} 位老师隐藏在暗处</div>`;
+        }
+        
+        html += `</div>`;
+        teacherBox.innerHTML = html;
       } else {
         teacherBox.style.display = 'none';
       }
