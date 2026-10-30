@@ -478,6 +478,11 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
       <div class="card-title">HALL OF FAME</div>
       <div class="card-heading">🏆 封神榜：补习中心历届最强前十名</div>
       <div class="hint" style="margin-bottom:10px">从学长学姐到现在的你们，各科成绩最好的前十名。你的目标：把自己的名字写上去！</div>
+      <!-- 👇 新增：封神榜切换范围 -->
+      <div style="background:var(--soft); padding:6px; border-radius:12px; display:inline-flex; gap:6px; margin-bottom:16px;">
+        <button class="rank-tab-btn active" data-action="setHofScope" data-scope="all">🏫 全中心</button>
+        <button class="rank-tab-btn" data-action="setHofScope" data-scope="class">👥 我的班级</button>
+      </div>
       <div id="hof-box"></div>
     </div>
   </div>
@@ -1149,17 +1154,30 @@ function shrink(file, max = 720) {
 let proofFor = null, proofData = null;
 
 // ===== 封神榜：各科前十名；同一个人只算他最好的一次成绩；同分并列 =====
-let hofSubj = '总分';
+let hofSubj = Auth.SUBJECTS[0]; // 默认显示第一科（华文）
+let hofScope = 'all'; // 默认查看全中心
 const fmt = n => +Number(n).toFixed(2);
 function renderHall() {
   const box = $('hof-box');
   if (!box) return;
   box.replaceChildren();
 const uid = Auth.users().find(u => u.id === me.id)?.uid;
-// 👇 过滤掉测试号的成绩
+const myClassId = Auth.users().find(u => u.id === me.id)?.classId;
+
+// 👇 更新全中心/班级按钮的高亮状态
+document.querySelectorAll('[data-action="setHofScope"]').forEach(b => b.classList.toggle('active', b.dataset.scope === hofScope));
+
+// 👇 过滤数据（过滤测试号 + 过滤班级）
 const all = Auth.hall().filter(e => {
   if (e.subject !== hofSubj) return false;
   if (e.studentId && e.studentId.toLowerCase().startsWith('test')) return false;
+  
+  // 如果点击了“我的班级”，则只保留同班同学
+  if (hofScope === 'class') {
+    if (!e.studentId) return false; 
+    const stu = Auth.users().find(u => u.uid === e.studentId);
+    return stu && stu.classId === myClassId;
+  }
   return true;
 });
   const group = list => {
@@ -1170,7 +1188,7 @@ const all = Auth.hall().filter(e => {
   const board = group(all.filter(e => e.isPublic)), rankOf = sc => 1 + board.filter(e => e.score > sc).length;
   const top = board.filter(e => rankOf(e.score) <= 10);
   const chips = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px' });
-  ['总分', ...Auth.SUBJECTS].forEach(s => chips.append(btn(s, 'hofSubj', { id: s }, s === hofSubj ? 'btn-action' : 'btn-action btn-gold')));
+  Auth.SUBJECTS.forEach(s => chips.append(btn(s, 'hofSubj', { id: s }, s === hofSubj ? 'btn-action' : 'btn-action btn-gold')));
   box.append(chips);
 
   const mine = uid ? group(all.filter(e => e.studentId === uid))[0] : null;   // 自己的最好成绩（老师录入并关联了账号才有）
@@ -1491,6 +1509,7 @@ let currentTradeId = null;
 const ACTIONS = {
     setRankScope({ scope }) { currentRankScope = scope; renderRankingList(); },
   setRankMetric({ metric }) { currentRankMetric = metric; renderRankingList(); },
+  setHofScope({ scope }) { hofScope = scope; renderHall(); },
     // 👇 新增：测试工具——打开自选宠物列表
   tSelectPet() {
     if (!isTest()) return;
