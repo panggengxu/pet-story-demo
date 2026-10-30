@@ -563,13 +563,14 @@ function render() {
             btn('转班', 'move', u.id, 'b ghost'), 
             btn('设为默认密码', 'resetDefaultPw', u.id, 'b ghost'), // 👈 默认密码放这里
             btn('手动改密', 'reset', u.id, 'b ghost'), 
-            btn('删除学生', 'del', u.id, 'b red')
-          )
+          btn('删除学生', 'del', u.id, 'b red')
         )
-      )));
-}
+      )
+    )));
+    }); // 👈 这是闭合学生列表循环的
+  }     // 👈 这是闭合 render() 函数的
 
-const A = {
+  const A = {
   logout: Auth.logout,
   coin(id) { const n = askNum('发放多少金币？（负数为扣除）'); if (n) { award(id, n, 0); render(); toast('已更新金币'); } },
   // 👇 新增：一键同时修改金币和星星
