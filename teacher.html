@@ -50,6 +50,75 @@ details.card summary {
 details.card summary::-webkit-details-marker { display: none; }
 details.card summary::before { content: '▶ '; font-size: 0.9em; transition: transform 0.2s; display: inline-block; margin-right: 4px; }
 details.card[open] summary::before { transform: rotate(90deg); }
+/* 👇 手机端表格变卡片专属样式 👇 */
+@media (max-width: 768px) {
+  /* 让包含学生列表的表格取消最小宽度限制 */
+  table:has(#rows) { min-width: 100%; }
+  /* 隐藏表头 */
+  table:has(#rows) thead { display: none; }
+  
+  /* 将每一行变成卡片 */
+  #rows tr {
+    display: flex;
+    flex-wrap: wrap;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  }
+  
+  #rows td {
+    display: block;
+    border: none;
+    padding: 4px 0;
+    white-space: normal;
+    font-size: 0.9rem;
+  }
+  
+  /* 姓名栏：占据整行，加粗并加下划线 */
+  #rows td:first-child {
+    width: 100%;
+    font-weight: bold;
+    font-size: 1rem;
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+  
+  /* 宠物、金币、星星、签到：每行显示两列 */
+  #rows td:nth-child(2), 
+  #rows td:nth-child(3), 
+  #rows td:nth-child(4), 
+  #rows td:nth-child(5) {
+    width: 50%;
+    color: var(--muted);
+  }
+  
+  /* 自动加上文字说明前缀 */
+  #rows td:nth-child(2)::before { content: '宠物: '; }
+  #rows td:nth-child(3)::before { content: '金币: '; }
+  #rows td:nth-child(4)::before { content: '星星: '; }
+  #rows td:nth-child(5)::before { content: '签到: '; }
+  
+  /* 操作栏：占据整行，按钮自动换行 */
+  #rows td.act {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  
+  /* 手机端下拉菜单修改为向左对齐展开，防止超出屏幕 */
+  #rows td.act details div {
+    right: auto !important;
+    left: 0;
+  }
+}
 </style>
 </head>
 <body>
