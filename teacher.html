@@ -106,11 +106,7 @@ details.card[open] summary::before { transform: rotate(90deg); }
       <button class="b ghost" data-a="copyTopics">复制未完成名单</button>
     </div>
     <div style="margin-bottom:8px;font-size:.82rem;color:var(--muted)">主题不按日期计算，学生什么时候交都在同一格勾选。同一科目可以添加多个主题。</div>
-    <div class="scroll"><table id="topic-table"></table></div>
-    <details style="margin-top:12px">
-      <summary id="topic-sum-title" style="cursor:pointer;font-weight:700;font-size:.9rem">📌 各主题未完成名单</summary>
-      <div id="topic-sum" style="margin-top:8px;font-size:.88rem;line-height:1.8"></div>
-    </details>
+    <div id="topic-list-container" style="display:flex; flex-direction:column; gap:8px; margin-top:12px;"></div>
   </section>
 
   <section class="card">
@@ -383,36 +379,104 @@ function renderSum() {
 
 // ===== 主题名单 =====
 const topicList = () => { const f = $('t-filter').value; return Auth.topics().filter(t => t.classId === curClass && (!f || t.subject === f)); };
+
+// ===== 全新的主题名单逻辑（方案 3） =====
 function renderTopics() {
-  const stu = students(), list = topicList(), tb = $('topic-table');
-  tb.replaceChildren(); $('topic-sum').replaceChildren(); $('topic-sum-title').textContent = '📌 各主题未完成名单';
-  if (!list.length) return tb.append(el('caption', { className: 'empty', textContent: '还没有主题，请先在上方添加。' }));
-  if (!stu.length) return tb.append(el('caption', { className: 'empty', textContent: emptyMsg() }));
-  tb.append(el('thead', {}, el('tr', {}, el('th', { textContent: '学生' }), ...list.map(t => el('th', {},
-    el('div', { textContent: t.title, style: 'font-weight:700' }),
-    el('div', { textContent: `${t.subject}·${t.kind}${t.due ? '·' + t.due.slice(5) + '截止' : ''}`, style: 'font-size:.7rem;color:var(--muted)' }),
-    btn('全勾', 'allTopic', t.id, 'b ghost'), btn('删除', 'delTopic', t.id, 'b red'))))));
-  const body = el('tbody');
-  stu.forEach(u => body.append(el('tr', {}, el('td', { textContent: u.name }), ...list.map(t => {
-    const c = el('input', { type: 'checkbox', className: 'chk', checked: t.done.includes(u.id) });
-    c.dataset.tid = t.id; c.dataset.tsid = u.id; c.setAttribute('aria-label', `${u.name} ${t.title}`);
-    return el('td', {}, c);
-  }))));
-  tb.append(body); renderTopicSum();
-}
-function renderTopicSum() {
-  const stu = students(), box = $('topic-sum'); box.replaceChildren();
-  let left = 0;
-  const list = topicList();
-  list.forEach(t => {
-    const todo = stu.filter(u => !t.done.includes(u.id)), late = todo.length && t.due && t.due < today();
-    left += todo.length;
-    box.append(el('div', {}, el('b', { textContent: `${t.subject}「${t.title}」：` }), `已完成 ${stu.length - todo.length}/${stu.length}　`,
-      el('span', { textContent: todo.length ? `未完成：${todo.map(u => u.name).join('、')}${late ? '　⚠️已过截止' : ''}` : '✅ 全部完成', style: todo.length ? 'color:#c22' : 'color:var(--ok)' })));
+  const container = $('topic-list-container');
+  if (!container) return;
+  container.replaceChildren();
+
+  const stu = students();
+  const list = topicList(); // 依赖 t-filter 下拉框过滤的科目
+  
+  if (!stu.length) {
+    return container.append(el('div', { className: 'empty', textContent: emptyMsg() }));
+  }
+  if (!list.length) {
+    return container.append(el('div', { className: 'empty', textContent: '还没有符合条件的主题。' }));
+  }
+
+  // 遍历每个学生，生成一行
+  stu.forEach(u => {
+    let doneCount = 0;
+    list.forEach(t => { if (t.done.includes(u.id)) doneCount++; });
+    
+    const isAllDone = doneCount === list.length;
+    const progressColor = isAllDone ? 'var(--ok)' : '#d33';
+    const progressBg = isAllDone ? '#e6faf5' : '#fde8e8';
+
+    const row = el('div', { 
+      style: 'display:flex; justify-content:space-between; align-items:center; background:var(--soft); padding:12px; border-radius:10px; border:1px solid var(--border); cursor:pointer; transition:0.2s'
+    },
+      el('div', { style: 'display:flex; flex-direction:column; gap:4px' },
+        el('b', { textContent: u.name, style: 'font-size:1rem; color:var(--text)' }),
+        el('div', { className: 'hint', style: 'font-size:.75rem' }, `已完成 ${doneCount} / ${list.length}`)
+      ),
+      el('div', { 
+        style: `background:${progressBg}; color:${progressColor}; font-weight:bold; padding:4px 10px; border-radius:20px; font-size:.8rem` 
+      }, isAllDone ? '✅ 全部完成' : '⏳ 待完成')
+    );
+
+    row.onclick = () => openTopicModal(u);
+    container.append(row);
   });
-  $('topic-sum-title').textContent = `📌 各主题未完成名单${list.length ? `（${left ? `共 ${left} 项未完成` : '全部完成 ✅'}）` : ''}`;
 }
 
+// 打开学生详情弹窗
+window.openTopicModal = function(stu) {
+  $('topic-modal-title').textContent = `📋 ${stu.name} 的任务详情`;
+  const listContainer = $('topic-modal-list');
+  listContainer.replaceChildren();
+  
+  const list = topicList(); // 依然只看当前筛选的科目
+
+  if (!list.length) {
+    listContainer.append(el('div', { className: 'empty', textContent: '没有可用的主题。' }));
+  } else {
+    list.forEach(t => {
+      const isChecked = t.done.includes(stu.id);
+      
+      const item = el('div', { style: 'display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px dashed var(--border)' },
+        el('div', {},
+          el('div', { style: 'font-weight:bold; color:var(--text)' }, t.title),
+          el('div', { className: 'hint', style: 'font-size:.7rem; margin-top:2px' }, `${t.subject} · ${t.kind} ${t.due ? '· ' + t.due.slice(5) + '截止' : ''}`)
+        ),
+        el('input', { 
+          type: 'checkbox', 
+          className: 'chk', 
+          checked: isChecked,
+          style: 'width:24px; height:24px; cursor:pointer; accent-color:var(--ok)',
+          onchange: (e) => {
+            const all = Auth.topics(), tData = all.find(x => x.id === t.id);
+            if (!tData) return;
+            const set = new Set(tData.done);
+            
+            if (e.target.checked) {
+              set.add(stu.id);
+              Auth.grant(stu.id, 30, 0, `完成主题：${t.title}`, 30);
+              toast(`✅ 已打勾，${stu.name} 获得 30🪙 + 30经验`);
+            } else {
+              set.delete(stu.id);
+              Auth.grant(stu.id, -30, 0, `取消主题：${t.title}`, -30);
+              toast(`↩️ 已取消，扣回 ${stu.name} 的 30🪙 和 30经验`);
+            }
+            tData.done = [...set];
+            Auth.saveTopics(all); 
+            renderTopics(); // 刷新背后的主列表进度
+          }
+        })
+      );
+      listContainer.append(item);
+    });
+  }
+  
+  $('topic-modal').style.display = 'flex';
+}
+
+window.closeTopicModal = function() {
+  $('topic-modal').style.display = 'none';
+}
+  
 function renderNotices() {
   const box = $('notice-list'); box.replaceChildren();
   const stu = students(), all = Auth.notices().filter(n => n.classId === curClass);
@@ -793,25 +857,7 @@ $('h-who').onchange = () => {                              // 选了在校学生
   if (u) { $('h-name').value = u.name; $('h-cls').value = curClassName(); }
 };
 $('t-filter').onchange = renderTopics;
-document.addEventListener('change', e => {                 // 主题名单：勾选自动保存 + 发奖励
-  const c = e.target.closest('[data-tid]');
-  if (!c) return;
-  const all = Auth.topics(), t = all.find(x => x.id === c.dataset.tid);
-  if (!t) return;
-  const set = new Set(t.done); 
-  
-  if (c.checked) {
-    set.add(c.dataset.tsid); 
-    Auth.grant(c.dataset.tsid, 30, 0, `完成主题：${t.title}`, 30);
-    toast(`✅ 已打勾，学生获得 30🪙 + 30经验`);
-  } else {
-    set.delete(c.dataset.tsid);
-    Auth.grant(c.dataset.tsid, -30, 0, `取消主题：${t.title}`, -30);
-    toast(`↩️ 已取消，扣回 30🪙 和 30经验`);
-  }
-  
-  t.done = [...set]; Auth.saveTopics(all); renderTopicSum();
-});
+
 document.addEventListener('change', e => {                 // 勾选/取消勾选，自动保存并发经验
   const c = e.target.closest('[data-sid]');
   if (!c) return;
@@ -860,5 +906,13 @@ document.addEventListener('change', async e => {           // 管理员勾选老
 Auth.ready.then(render);
 setInterval(() => { if (!document.hidden && !Auth.busy()) Auth.refresh().then(render).catch(() => {}); }, 30000);   // 每 30 秒同步一次最新数据
 </script>
+<!-- 👇 新增：学生主题详情弹窗 👇 -->
+<div id="topic-modal" class="modal-overlay" role="dialog" aria-modal="true" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;justify-content:center;align-items:center">
+  <div class="modal-box" style="background:#fff;padding:20px;border-radius:16px;width:min(450px,90vw);max-height:80vh;overflow-y:auto;text-align:left">
+    <h3 id="topic-modal-title" style="color:var(--primary);margin-bottom:12px"></h3>
+    <div id="topic-modal-list" style="display:flex;flex-direction:column;gap:10px"></div>
+    <button class="b btn-block" style="margin-top:16px;width:100%" onclick="closeTopicModal()">关闭</button>
+  </div>
+</div>
 </body>
 </html>
