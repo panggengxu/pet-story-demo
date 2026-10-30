@@ -143,9 +143,8 @@ details.card[open] summary::before { transform: rotate(90deg); }
     <div id="notice-list"></div>
   </section>
 
-  <section class="card">
-    <details>
-      <summary style="cursor:pointer;font-weight:700;font-size:1.05rem">🏆 封神榜管理（录入考试成绩）</summary>
+  <details class="card">
+    <summary>🏆 封神榜管理（录入考试成绩）</summary>
       <div style="margin:8px 0;font-size:.85rem;color:var(--muted);line-height:1.6">录入全中心的优秀成绩（包括已毕业的学长学姐），学生在“🏆 封神榜”里能看到各科前十名。<br>只有勾选“公开”的条目学生才看得到，公开显示的是完整姓名，请先征得本人或家长同意。</div>
       <div class="row">
         <label>选择学生<select id="h-who"></select></label>
@@ -161,12 +160,10 @@ details.card[open] summary::before { transform: rotate(90deg); }
       <div class="row" style="margin:14px 0 8px"><label>只看科目<select id="hf-subj"><option value="">全部</option></select></label></div>
       <div style="font-size:.85rem;margin-bottom:6px">共 <span id="hof-count">0</span> 条（按分数从高到低）</div>
       <div class="scroll"><table><thead><tr><th>姓名</th><th>班别/届别</th><th>科目</th><th>考试</th><th>分数</th><th>公开</th><th>操作</th></tr></thead><tbody id="hof-rows"></tbody></table></div>
-    </details>
-  </section>
+  </details>
 
-  <section class="card">
-    <details>
-      <summary style="cursor:pointer;font-weight:700;font-size:1.05rem">💬 留言墙管理（查看、删除不当留言）</summary>
+  <details class="card">
+    <summary>💬 留言墙管理（查看、删除不当留言）</summary>
       <div style="margin:8px 0;font-size:.85rem;color:var(--muted)">这里显示当前班级的留言和“全部班级”的留言。学生每小时最多发 10 条，超过 30 天的留言会自动删除。</div>
       <div class="row">
         <label>发布范围<select id="tw-scope"><option value="class">当前班级</option><option value="all">全部班级</option></select></label>
@@ -174,21 +171,18 @@ details.card[open] summary::before { transform: rotate(90deg); }
         <button class="b" data-a="teacherPost">以老师身份发布</button>
       </div>
       <div id="tw-list" style="margin-top:10px;max-height:420px;overflow-y:auto"></div>
-    </details>
-  </section>
+  </details>
 
-  <section class="card">
-    <details>
-      <summary style="cursor:pointer;font-weight:700;font-size:1.05rem">🎓 一键升班（新学年用）</summary>
+  <details class="card">
+    <summary>🎓 一键升班（新学年用）</summary>
       <div style="margin:8px 0;font-size:.85rem;color:var(--muted);line-height:1.6">给每个班选择升到哪个班，点“一键升班”后，整班学生一次移过去，学号不变。<br>六年级请升到一个叫“已毕业”的班级（先在管理员的班级管理里建好）。普通老师需要同时负责升入前后两个班，管理员没有这个限制。</div>
       <div id="promote-list"></div>
       <button class="b" data-a="promote" style="margin-top:10px">一键升班</button>
-    </details>
-  </section>
+  </details>
 
-  <section class="card">
-    <h2>➕ 添加学生</h2>
-    <div class="row">
+  <details class="card">
+    <summary>➕ 添加学生</summary>
+    <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
       <label>学号（例如 p26001）<input id="n-id" maxlength="20" placeholder="p26001"></label>
       <label>姓名<input id="n-name" maxlength="40"></label>
       <label>初始密码<input id="n-pw" type="text" maxlength="30"></label>
@@ -201,7 +195,7 @@ details.card[open] summary::before { transform: rotate(90deg); }
       <button class="b" data-a="add">添加</button>
     </div>
     <div style="margin-top:8px;font-size:.82rem;color:var(--muted)">学号规则：p + 入学年份后两位 + 3 位序号。例如 2026 年入读一年级的第 1 位同学是 p26001，一直用到六年级毕业都不用改，系统会自动算出他现在读几年级。</div>
-  </section>
+  </details>
 
   <section class="card">
     <h2>📋 学生列表（<span id="count">0</span> 人）</h2>
