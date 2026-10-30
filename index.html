@@ -1173,9 +1173,24 @@ const all = Auth.hall().filter(e => {
   
   // 如果点击了“我的班级”，则只保留同班同学
   if (hofScope === 'class') {
-    if (!e.studentId) return false; 
-    const stu = Auth.users().find(u => u.uid === e.studentId);
-    return stu && stu.classId === myClassId;
+    const myClassObj = Auth.classes().find(c => c.id === myClassId);
+    const myClassName = myClassObj ? myClassObj.name : '';
+
+    // 1. 先看他有没有绑定学生账号
+    if (e.studentId) {
+      const stu = Auth.users().find(u => u.uid === e.studentId);
+      // 如果绑定了，且他在当前班级，放行
+      if (stu && stu.classId === myClassId) return true;
+    }
+
+    // 2. 如果没绑定账号，或者绑定的账号不对，我们看老师手打的班级文字（classLabel）
+    // 只要文字里包含当前班级的名字（比如包含 "12"），就放行
+    if (e.classLabel && myClassName) {
+       return e.classLabel.trim().includes(myClassName.trim());
+    }
+
+    // 剩下的全部隐藏
+    return false;
   }
   return true;
 });
