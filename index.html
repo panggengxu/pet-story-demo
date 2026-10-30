@@ -1746,17 +1746,6 @@ const ACTIONS = {
       }, 2800);
     });
   },
-
-    inspectTeacher({ id }) {
-    const row = window.currentCandidates?.find(c => c.other === id);
-    if (row) {
-       ACTIONS.inspectTeam({ id }); // 直接复用原有的查看阵容逻辑
-    } else {
-       // 如果在学生列表里没找到（因为老师被单独剔除了），用数据库里的数据临时渲染
-       // 因为现有的 inspectTeam 依赖 currentCandidates，为了最稳，我们这里直接手动触发。
-       // 实际上，为了避免大改，你可以在 renderRankingList 里顺便把 topTeacher 也塞进 window.currentCandidates 里。
-    }
-  },
   
   inspectTeam({ id }) {
     let targetName = '';
