@@ -437,34 +437,56 @@ window.openTopicModal = function(stu) {
       const isChecked = t.done.includes(stu.id);
       
       const item = el('div', { style: 'display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px dashed var(--border)' },
+        // 左边：主题信息
         el('div', {},
           el('div', { style: 'font-weight:bold; color:var(--text)' }, t.title),
           el('div', { className: 'hint', style: 'font-size:.7rem; margin-top:2px' }, `${t.subject} · ${t.kind} ${t.due ? '· ' + t.due.slice(5) + '截止' : ''}`)
         ),
-        el('input', { 
-          type: 'checkbox', 
-          className: 'chk', 
-          checked: isChecked,
-          style: 'width:24px; height:24px; cursor:pointer; accent-color:var(--ok)',
-          onchange: (e) => {
-            const all = Auth.topics(), tData = all.find(x => x.id === t.id);
-            if (!tData) return;
-            const set = new Set(tData.done);
-            
-            if (e.target.checked) {
-              set.add(stu.id);
-              Auth.grant(stu.id, 30, 0, `完成主题：${t.title}`, 30);
-              toast(`✅ 已打勾，${stu.name} 获得 30🪙 + 30经验`);
-            } else {
-              set.delete(stu.id);
-              Auth.grant(stu.id, -30, 0, `取消主题：${t.title}`, -30);
-              toast(`↩️ 已取消，扣回 ${stu.name} 的 30🪙 和 30经验`);
+        
+        // 👇 右边：勾选框 + 删除按钮 （这次包在一个 div 里）👇
+        el('div', { style: 'display:flex; align-items:center; gap:12px' },
+          el('input', { 
+            type: 'checkbox', 
+            className: 'chk', 
+            checked: isChecked,
+            style: 'width:24px; height:24px; cursor:pointer; accent-color:var(--ok)',
+            onchange: (e) => {
+              const all = Auth.topics(), tData = all.find(x => x.id === t.id);
+              if (!tData) return;
+              const set = new Set(tData.done);
+              
+              if (e.target.checked) {
+                set.add(stu.id);
+                Auth.grant(stu.id, 30, 0, `完成主题：${t.title}`, 30);
+                toast(`✅ 已打勾，${stu.name} 获得 30🪙 + 30经验`);
+              } else {
+                set.delete(stu.id);
+                Auth.grant(stu.id, -30, 0, `取消主题：${t.title}`, -30);
+                toast(`↩️ 已取消，扣回 ${stu.name} 的 30🪙 和 30经验`);
+              }
+              tData.done = [...set];
+              Auth.saveTopics(all); 
+              renderTopics(); // 刷新背后的主列表进度
             }
-            tData.done = [...set];
-            Auth.saveTopics(all); 
-            renderTopics(); // 刷新背后的主列表进度
-          }
-        })
+          }),
+          // 👇 这就是你要的删除按钮 👇
+          el('button', { 
+            className: 'b red', 
+            textContent: '删除',
+            style: 'padding: 4px 8px; font-size: 0.75rem; border-radius: 6px;',
+            onclick: () => {
+              if (!confirm(`确定要删除主题「${t.title}」吗？\n所有学生在这个主题的打勾记录都会被彻底清除。`)) return;
+              
+              const all = Auth.topics();
+              Auth.saveTopics(all.filter(x => x.id !== t.id)); // 删掉这个主题
+              toast('🗑️ 已删除该主题');
+              
+              // 重新渲染弹窗和背后的列表
+              window.openTopicModal(stu); 
+              renderTopics(); 
+            }
+          })
+        )
       );
       listContainer.append(item);
     });
