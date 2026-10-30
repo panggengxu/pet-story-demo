@@ -1472,7 +1472,7 @@ async function renderRankingList() {
           html += `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed rgba(255,255,255,0.2);">
               <div>
-                <div style="font-size:1.1rem; font-weight:bold;">${['🥇','🥈','🥉'][idx] || (idx+1)+'.'} ${t.name} 老师</div>
+                <div style="font-size:1.1rem; font-weight:bold;">${['🥇','🥈','🥉'][idx] || (idx+1)+'.'} ${t.name}</div>
                 <div style="font-size:1.2rem; font-weight:900;">${power || 0} <span style="font-size:.8rem">Pt (${label})</span></div>
               </div>
               <button class="btn-action btn-gold" style="padding:6px 10px; border-radius:8px; font-size:0.75rem;" data-action="inspectTeacher" data-id="${t.user_id}">🔍 瞻仰</button>
