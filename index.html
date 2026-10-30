@@ -1397,20 +1397,15 @@ async function renderRankingList() {
 // 然后把原来的 dbList 换成 cleanDbList
 let candidates = cleanDbList.map(u => ({
   name: u.name + (u.code === me.id ? '（我）' : ''),
-  // ... 下面保持不变 ...
+  cls: u.class_name,
+  totalPower: u.total_power || 0,
+  maxPower: u.max_power || 0,
+  isFriend: u.is_friend,
+  me: u.code === me.id,
+  other: u.user_id,
+  rawSave: u.save_data
 }));
-
-    let candidates = dbList.map(u => ({
-      name: u.name + (u.code === me.id ? '（我）' : ''),
-      cls: u.class_name,
-      totalPower: u.total_power || 0,
-      maxPower: u.max_power || 0,
-      isFriend: u.is_friend,
-      me: u.code === me.id,
-      other: u.user_id,
-      rawSave: u.save_data
-    }));
-
+    
     // 排序
     candidates.sort((a, b) => currentRankMetric === 'total' ? (b.totalPower - a.totalPower) : (b.maxPower - a.maxPower));
 
