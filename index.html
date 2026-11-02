@@ -1953,7 +1953,6 @@ saveSkills() {
       if (window.rankTimer) clearInterval(window.rankTimer);
     }
   },
-  cheat() { state.coins += 500; render(); toast('🪙 已增加 500 金币（调试）'); },
   hatch() { ACTIONS.adopt(); },
   adopt() {
   if (state.coins < HATCH_COST) return toast(`❌ 金币不足，需要 ${HATCH_COST} 金币`);
@@ -2186,11 +2185,14 @@ toWarehouse({ id }) {
       return toast('❌ 购买失败：手慢了，库存刚刚被别人抢空了！');
     }
 
-    // 记订单
-    const { data: { user } } = await Auth.sb.auth.getUser();
-    await Auth.sb.from('stationery_orders').insert({
-      student_id: user.id, item_id: item.id, item_name: item.name, item_icon: item.icon, source: 'shop', cost: item.shop_price
+    // 记订单（失败的话：库存还回去，也不扣金币，不让学生白白损失）
+    const { error: errOrder } = await Auth.sb.from('stationery_orders').insert({
+      student_id: await myUidFast(), item_id: item.id, item_name: item.name, item_icon: item.icon, source: 'shop', cost: item.shop_price
     });
+    if (errOrder) {
+      await Auth.sb.from('stationery_stock').update({ stock: item.stock }).eq('id', id).eq('stock', item.stock - 1);
+      return toast('❌ 下单失败，没有扣你的金币，请稍后再试');
+    }
 
     // 扣钱并保存
     state.coins -= item.shop_price;
@@ -2265,11 +2267,15 @@ toWarehouse({ id }) {
       return toast(`🎁 抽中了【${prize.name}】，但手慢了被抢空了。已退还 15🪙 安慰奖给你。`);
     }
 
-    // 记订单
-    const { data: { user } } = await Auth.sb.auth.getUser();
-    await Auth.sb.from('stationery_orders').insert({
-      student_id: user.id, item_id: prize.id, item_name: prize.name, item_icon: prize.icon, source: 'gacha', cost: GACHA_PRICE
+    // 记订单（失败的话：库存还回去，金币全额退还）
+    const { error: errOrder } = await Auth.sb.from('stationery_orders').insert({
+      student_id: await myUidFast(), item_id: prize.id, item_name: prize.name, item_icon: prize.icon, source: 'gacha', cost: GACHA_PRICE
     });
+    if (errOrder) {
+      await Auth.sb.from('stationery_stock').update({ stock: prize.stock }).eq('id', prize.id).eq('stock', prize.stock - 1);
+      state.coins += GACHA_PRICE; save(); pushSave(true); render();
+      return toast('❌ 下单失败，金币已全额退还，请稍后再试');
+    }
 
     save(); pushSave(true); render();
     $('gacha-reward-icon').textContent = prize.icon;
@@ -2794,11 +2800,15 @@ async function useSkill(skill) {
 }
   
 let checkingDuel = false;
+// 当前登录用户的 id：优先用已经载入的资料，没有就读本机的登录状态——两种都不联网。
+// （原来每次都向服务器确认身份，定时检查里一分钟要问几十次）
+async function myUidFast() {
+  return Auth.users().find(u => u.id === me.id)?.uid || (await Auth.sb.auth.getSession()).data.session?.user.id;
+}
 async function notifyDuels() {                             // 有人向我发起了挑战、我还没进房间？
   if (checkingDuel || $('duel-modal').classList.contains('open')) return;
   checkingDuel = true;
   try {
-    await Auth.sb.rpc('duel_expire');                      // 先让服务器把超时的旧对战结束掉
     const { data, error } = await Auth.sb.rpc('my_pending_duel');   // 用数据库函数查，不受表读取权限限制
     if (error) throw error;
     const d = (data || [])[0];
@@ -2991,7 +3001,7 @@ render();
     if (isProcessingMyTrade) return;
     isProcessingMyTrade = true;
     try {
-      const myUid = (await Auth.sb.auth.getUser()).data.user.id;
+      const myUid = (await myUidFast());
       
       // 👇 核心修改1：同时查询 accepted（同意）和 rejected（拒绝）状态
       const { data: trades, error: fetchErr } = await Auth.sb.from('pet_trades')
@@ -3041,7 +3051,7 @@ render();
     if (isProcessingDefenderTrade) return;
     isProcessingDefenderTrade = true;
     try {
-      const myUid = (await Auth.sb.auth.getUser()).data.user.id;
+      const myUid = (await myUidFast());
       // 只查 completed 状态的记录
       const { data: trades, error: fetchErr } = await Auth.sb.from('pet_trades')
         .select('*').eq('defender_id', myUid).eq('status', 'completed').limit(1);

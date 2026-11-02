@@ -62,7 +62,7 @@ th{color:var(--muted);font-size:.75rem}
 
   <section class="card">
     <h2>⏳ 待发货订单</h2>
-    <div class="hint" style="margin-bottom:12px;color:var(--muted);font-size:.85rem">只显示当前筛选班级的学生订单。如果缺货，可以点“退款”直接把金币退回给学生。</div>
+    <div class="hint" style="margin-bottom:12px;color:var(--muted);font-size:.85rem">显示全中心所有待发货的订单，先下单的排在前面。如果缺货，可以点“缺货退款”，金币会自动退回给学生。</div>
     <div id="t-order-list"></div>
   </section>
 </div>
@@ -78,17 +78,6 @@ const $ = id => document.getElementById(id);
 const el = (t, p = {}, ...k) => { const n = Object.assign(document.createElement(t), p); n.append(...k); return n; };
 let tt; const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2200); };
 const btn = (text, a, id, cls = 'b') => { const b = el('button', { className: cls, textContent: text }); b.dataset.a = a; if (id) b.dataset.id = id; return b; };
-
-let curClass = '';
-const myUser = () => Auth.users().find(u => u.id === me.id) || me;
-const myClasses = () => { const u = myUser(), all = Auth.classes(); return u.admin ? all : all.filter(c => (u.classIds || []).includes(c.id)); };
-
-function renderClassSelect() {
-  const cs = myClasses(), sel = $('cls');
-  if (!cs.some(c => c.id === curClass)) curClass = cs[0]?.id || '';
-  sel.replaceChildren(...(cs.length ? cs.map(c => new Option(c.name, c.id)) : [new Option('（暂无班级）', '')]));
-  sel.value = curClass;
-}
 
 async function renderData() {
   try {
@@ -147,45 +136,54 @@ async function renderData() {
     }));
   } catch (e) {
     console.error('加载失败', e);
+    toast('❌ 加载失败，请刷新页面再试');
   }
 }
 
-// 核心操作
+// 核心操作（每一步都检查结果，失败要告诉老师，不再“看起来成功了其实没成功”）
 async function updateStock(id, val) {
-  const stock = Math.max(0, Number(val));
-  await Auth.sb.from('stationery_stock').update({ stock }).eq('id', id);
-  toast('库存已更新');
+  const stock = Math.max(0, Math.floor(Number(val)) || 0);
+  const { error } = await Auth.sb.from('stationery_stock').update({ stock }).eq('id', id);
+  toast(error ? '❌ 库存没保存成功：' + error.message : '库存已更新');
   renderData();
 }
 
 const A = {
   logout: Auth.logout,
   async toggleStock(id) {
-    const { data: it } = await Auth.sb.from('stationery_stock').select('active').eq('id', id).single();
-    if (it) await Auth.sb.from('stationery_stock').update({ active: !it.active }).eq('id', id);
+    const { data: it, error: e1 } = await Auth.sb.from('stationery_stock').select('active').eq('id', id).single();
+    if (e1 || !it) return toast('❌ 读取失败，请刷新页面再试');
+    const { error } = await Auth.sb.from('stationery_stock').update({ active: !it.active }).eq('id', id);
+    if (error) return toast('❌ 操作失败：' + error.message);
     toast(it.active ? '🚫 已下架' : '✅ 已上架');
     renderData();
   },
   async claimOrder(id) {
-    await Auth.sb.from('stationery_orders').update({ status: 'claimed', claimed_at: new Date().toISOString(), claimed_by: me.name }).eq('id', id);
-    toast('✅ 已标记为已发货');
+    // 带条件：只有“待发货”的订单才能标记，避免两位老师同时点
+    const { data, error } = await Auth.sb.from('stationery_orders')
+      .update({ status: 'claimed', claimed_at: new Date().toISOString(), claimed_by: me.name })
+      .eq('id', id).eq('status', 'pending').select();
+    if (error) toast('❌ 操作失败：' + error.message);
+    else if (!data || !data.length) toast('这笔订单已经被处理过了');
+    else toast('✅ 已标记为已发货');
     renderData();
   },
   async refundOrder(id) {
     if (!confirm('确认该商品缺货，需要退款吗？系统将自动退回金币给学生。')) return;
-    
-    // 查订单
     const { data: r } = await Auth.sb.from('stationery_orders').select('*').eq('id', id).single();
-    if (!r) return;
-    
-    // 标记退款
-    await Auth.sb.from('stationery_orders').update({ status: 'refunded' }).eq('id', id);
-    
-    // 通过 awards 表退钱
-    await Auth.sb.from('awards').insert({
+    if (!r || r.status !== 'pending') { toast('这笔订单已经被处理过了'); return renderData(); }
+    // 第 1 步：先把订单从“待发货”改成“已退款”（带条件，防止两位老师同时退款、学生被退两次）
+    const { data: upd, error: e1 } = await Auth.sb.from('stationery_orders').update({ status: 'refunded' }).eq('id', id).eq('status', 'pending').select();
+    if (e1 || !upd || !upd.length) { toast('这笔订单已经被处理过了'); return renderData(); }
+    // 第 2 步：再退金币。失败的话把订单恢复成“待发货”，不会出现“订单没了、钱也没退”
+    const { error: e2 } = await Auth.sb.from('awards').insert({
       student_id: r.student_id, coins: r.cost, stars: 0, exp: 0, note: `文具缺货退款：${r.item_name}`
     });
-    
+    if (e2) {
+      await Auth.sb.from('stationery_orders').update({ status: 'pending' }).eq('id', id);
+      toast('❌ 退款失败：' + e2.message + '（可能你没有这位学生所在班级的权限，请联系管理员处理）');
+      return renderData();
+    }
     toast('↩️ 已退款，金币会自动补发给学生');
     renderData();
   }
