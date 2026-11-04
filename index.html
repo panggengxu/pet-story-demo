@@ -2871,27 +2871,28 @@ function resetState() {
     )));
 })();
 
-async function claim() {                                   // 领取：老师发的、签到的、好友送的金币、星星和经验，以及好友送的配件
+async function claim() { 
   notifyDuels().catch(() => {});
   const got = await Auth.claimAwards(), items = await Auth.claimGiftItems().catch(() => []);
   
   const c = got.reduce((n, x) => n + (x.coins || 0), 0);
   const t = got.reduce((n, x) => n + (x.stars || 0), 0);
-  const e = got.reduce((n, x) => n + (x.exp || 0), 0); // <-- 计算总经验
+  const e = got.reduce((n, x) => n + (x.exp || 0), 0);
   const notes = [];
   
   if (got.length) { 
+    // 👇 允许变成负数，最低扣到 -1000 和 -100
     state.coins = Math.max(-1000, state.coins + c); 
     state.stars = Math.max(-100, state.stars + t); 
-    state.petExp = (state.petExp || 0) + e;
-  
-    // 👇 这里只推入纯数字，不带前缀
+    state.petExp = (state.petExp || 0) + e; 
+    
+    // 👇 把金额转成正数，存进 notes
     if (c || t || e) {
       notes.push(`${Math.abs(c)}🪙 ${Math.abs(t)}⭐ ${Math.abs(e)}经验`);
     }
   }
 
-  // 下面这部分是领取好友送的配件，保留原样
+  // 领取好友送的配件
   items.forEach(x => {
     const base = POOL.find(p => p.name === x.item_name);
     if (base) { state.inventory.push({ ...base }); notes.push(`【${base.name}】（来自 ${x.sender_name}）`); }
@@ -2899,23 +2900,13 @@ async function claim() {                                   // 领取：老师发
 
   if (!notes.length) return;
   save(); pushSave(true);
-
-  // 👇 核心修复：动态判断是“收到”还是“扣除”
+  
+  // 👇 核心修复：判断是发奖还是惩罚
   if (c < 0 || t < 0 || e < 0) {
-    toast(`⚠️ 老师对你进行了处罚：${notes.join('、')}`);
+    toast(`⚠️ 老师对你进行了处罚：扣除了 ${notes.join('、')}`);
   } else {
     toast(`🎁 你收到了 ${notes.join('、')}`);
   }
-
-  // 下面这部分是领取好友送的配件，保留原样
-  items.forEach(x => {
-    const base = POOL.find(p => p.name === x.item_name);   // 只认奖池里真实存在的配件
-    if (base) { state.inventory.push({ ...base }); notes.push(`【${base.name}】（来自 ${x.sender_name}）`); }
-  });
-
-  if (!notes.length) return;
-  save(); pushSave(true);
-  toast(`🎁 你收到了 ${notes.join('、')}`);
 }
 async function poll() {                                    // 同步老师新发布的公告和奖励
   try { await Auth.refresh(); await claim(); render(); } catch (e) { /* 网络不好时下次再试 */ }
