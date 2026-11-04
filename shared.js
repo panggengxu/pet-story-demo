@@ -176,25 +176,31 @@ const Auth = (() => {
       if (del.length) ops.push(async () => ck(await sb.from('records').delete().eq('day', day).eq('kind', kind).eq('subject', subject).in('student_id', del.map(uidOf))));
       // 签到 / 默写 / 功课：自动发经验奖励，取消勾选就扣回
       const isCheckin = (kind === CHECKIN);
-      const isHomework = (kind === '默写' || kind === '功课');
-      
-      if (isCheckin || isHomework) {
+      const isDictation = (kind === '默写'); // 👈 分开：默写
+      const isHomework = (kind === '功课');  // 👈 分开：功课
+
+      if (isCheckin || isDictation || isHomework) {
         const rows = [...add.map(c => [c, 1]), ...del.map(c => [c, -1])];
-        // 签到给 20 经验，默写/功课给 30 经验
-        const expReward = isCheckin ? 20 : 30; 
-        
+  
+        // 👈 分别设定金币和经验
+        let expReward = 0, coinReward = 0;
+        if (isCheckin) { expReward = 20; coinReward = CHECKIN_REWARD.coins; }
+        if (isDictation) { expReward = 20; coinReward = 10; }
+        if (isHomework) { expReward = 30; coinReward = 20; }
+  
         for (const [c, sign] of rows) {
           const o = PA[c] ||= { coins: 0, stars: 0 };
-          if (isCheckin) { o.coins += sign * CHECKIN_REWARD.coins; o.stars += sign * CHECKIN_REWARD.stars; }
+          o.coins += sign * coinReward;
+          if (isCheckin) o.stars += sign * CHECKIN_REWARD.stars;
         }
-        
+  
         if (rows.length) {
           ops.push(async () => {
             const insertData = rows.map(([c, sign]) => ({
               student_id: uidOf(c), 
-              coins: isCheckin ? sign * CHECKIN_REWARD.coins : 0, 
+              coins: sign * coinReward,  // 👈 存入动态金币
               stars: isCheckin ? sign * CHECKIN_REWARD.stars : 0, 
-              exp: sign * expReward, // <-- 这里的 exp 会存进数据库
+              exp: sign * expReward, 
               note: `${kind}：${subject}` 
             }));
             ck(await sb.from('awards').insert(insertData));
