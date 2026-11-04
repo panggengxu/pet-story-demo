@@ -2883,15 +2883,28 @@ async function claim() {                                   // 领取：老师发
   if (got.length) { 
     state.coins = Math.max(-1000, state.coins + c); 
     state.stars = Math.max(-100, state.stars + t); 
-    state.petExp = (state.petExp || 0) + e; // <-- 加上经验
+    state.petExp = (state.petExp || 0) + e;
+  
+    // 👇 这里只推入纯数字，不带前缀
     if (c || t || e) {
-      // 只要有负数，就提示“被扣除”，否则提示“收到了”
-      if (c < 0 || t < 0 || e < 0) {
-        notes.push(`⚠️ 被扣除 ${Math.abs(c)}🪙 ${Math.abs(t)}⭐ ${Math.abs(e)}经验`);
-      } else {
-        notes.push(`${c}🪙 ${t}⭐ ${e}经验`);
-      }
+      notes.push(`${Math.abs(c)}🪙 ${Math.abs(t)}⭐ ${Math.abs(e)}经验`);
     }
+  }
+
+  // 下面这部分是领取好友送的配件，保留原样
+  items.forEach(x => {
+    const base = POOL.find(p => p.name === x.item_name);
+    if (base) { state.inventory.push({ ...base }); notes.push(`【${base.name}】（来自 ${x.sender_name}）`); }
+  });
+
+  if (!notes.length) return;
+  save(); pushSave(true);
+
+  // 👇 核心修复：动态判断是“收到”还是“扣除”
+  if (c < 0 || t < 0 || e < 0) {
+    toast(`⚠️ 老师对你进行了处罚：${notes.join('、')}`);
+  } else {
+    toast(`🎁 你收到了 ${notes.join('、')}`);
   }
 
   // 下面这部分是领取好友送的配件，保留原样
