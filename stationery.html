@@ -67,13 +67,13 @@ th{color:var(--muted);font-size:.75rem}
     margin-bottom: 8px;
   }
   
-  /* 第 2、3 列：权重和价格（各占一半） */
+  /* 第 2、3 列：概率和价格（各占一半） */
   #t-stock-rows td:nth-child(2), 
   #t-stock-rows td:nth-child(3) {
     width: 50%;
     color: var(--muted);
   }
-  #t-stock-rows td:nth-child(2)::before { content: '权重: '; margin-right: 4px; }
+  #t-stock-rows td:nth-child(2)::before { content: '概率: '; margin-right: 4px; }
   #t-stock-rows td:nth-child(3)::before { content: '价格: '; margin-right: 4px; }
   
   /* 第 4 列：库存（占满整行） */
@@ -113,7 +113,7 @@ th{color:var(--muted);font-size:.75rem}
         <thead>
           <tr>
             <th>商品名称</th>
-            <th>盲盒权重</th>
+            <th>盲盒概率(数字越大越容易中)</th>
             <th>商店直售价格</th>
             <th>当前库存</th>
             <th>状态操作</th>
