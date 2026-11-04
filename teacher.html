@@ -938,14 +938,6 @@ function render() {
     if (k === '签到') { expAmount = 20; coinAmount = 10; }
     if (k === '默写') { expAmount = 20; coinAmount = 50; }
     if (k === '功课') { expAmount = 30; coinAmount = 20; }
-
-    if ((expAmount > 0 || coinAmount > 0) && ids.length) {
-      const sign = isAllDone ? -1 : 1; // 如果是取消全勾，就扣奖励
-      const starAmount = k === '签到' ? 1 : 0;
-      ids.forEach(id => {
-        Auth.grant(id, coinAmount * sign, starAmount * sign, `${sign > 0 ? '批量完成' : '批量取消'}${k}：${s}`, expAmount * sign); 
-      });
-    }
     
     Auth.saveRecords(all); renderRoster(); 
     if (!isAllDone && (expAmount > 0 || coinAmount > 0)) toast('已全班打勾，并发放了奖励！');
@@ -1050,17 +1042,15 @@ document.addEventListener('change', e => {                 // 勾选/取消勾�
   if (k === '默写') { expAmount = 20; coinAmount = 50; }
   if (k === '功课') { expAmount = 30; coinAmount = 20; }
 
-  // 👇 2. 根据打勾/取消，发正数或负数奖励
+  // 👇 2. 根据打勾/取消，只弹提示（发奖逻辑在 shared.js 统一处理）
   if (c.checked) {
     set.add(c.dataset.sid);
     if (expAmount > 0 || coinAmount > 0) {
-      Auth.grant(c.dataset.sid, coinAmount, k === '签到' ? 1 : 0, `${k}：${c.dataset.subj}`, expAmount);
       toast(`✅ 已打勾，获得 ${coinAmount}金币和${expAmount}经验`);
     }
   } else {
     set.delete(c.dataset.sid);
     if (expAmount > 0 || coinAmount > 0) {
-      Auth.grant(c.dataset.sid, -coinAmount, k === '签到' ? -1 : 0, `取消${k}：${c.dataset.subj}`, -expAmount);
       toast(`↩️ 已取消，扣回 ${coinAmount}金币和${expAmount}经验`);
     }
   }
