@@ -185,7 +185,7 @@ const Auth = (() => {
         // 👈 分别设定金币和经验
         let expReward = 0, coinReward = 0;
         if (isCheckin) { expReward = 20; coinReward = CHECKIN_REWARD.coins; }
-        if (isDictation) { expReward = 20; coinReward = 10; }
+        if (isDictation) { expReward = 20; coinReward = 50; }
         if (isHomework) { expReward = 30; coinReward = 20; }
   
         for (const [c, sign] of rows) {
