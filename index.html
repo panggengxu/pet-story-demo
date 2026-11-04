@@ -2881,11 +2881,17 @@ async function claim() {                                   // 领取：老师发
   const notes = [];
   
   if (got.length) { 
-    state.coins = Math.max(0, state.coins + c); 
-    state.stars = Math.max(0, state.stars + t); 
+    state.coins = Math.max(-1000, state.coins + c); 
+    state.stars = Math.max(-100, state.stars + t); 
     state.petExp = (state.petExp || 0) + e; // <-- 加上经验
-    if (c || t || e) notes.push(`${c}🪙 ${t}⭐ ${e}经验`); 
-  }
+    if (c || t || e) {
+      // 只要有负数，就提示“被扣除”，否则提示“收到了”
+      if (c < 0 || t < 0 || e < 0) {
+        notes.push(`⚠️ 被扣除 ${Math.abs(c)}🪙 ${Math.abs(t)}⭐ ${Math.abs(e)}经验`);
+      } else {
+        notes.push(`${c}🪙 ${t}⭐ ${e}经验`);
+      }
+    }
 
   // 下面这部分是领取好友送的配件，保留原样
   items.forEach(x => {
