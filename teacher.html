@@ -933,20 +933,22 @@ function render() {
     const isAllDone = ids.every(id => (all[key] || []).includes(id));
     all[key] = isAllDone ? [] : ids;
     
-    // 👇 新增：全勾/全取消时，批量发/扣经验
-    let expAmount = 0;
-    if (k === '签到') expAmount = 20;
-    if (k === '默写' || k === '功课') expAmount = 30;
-    
-    if (expAmount > 0 && ids.length) {
-      const sign = isAllDone ? -1 : 1; // 如果是取消全勾，就扣经验
+    // 👇 新增：全勾/全取消时，批量发/扣经验和金币
+    let expAmount = 0, coinAmount = 0;
+    if (k === '签到') { expAmount = 20; coinAmount = 10; }
+    if (k === '默写') { expAmount = 20; coinAmount = 50; }
+    if (k === '功课') { expAmount = 30; coinAmount = 20; }
+
+    if ((expAmount > 0 || coinAmount > 0) && ids.length) {
+      const sign = isAllDone ? -1 : 1; // 如果是取消全勾，就扣奖励
+      const starAmount = k === '签到' ? 1 : 0;
       ids.forEach(id => {
-        Auth.grant(id, 0, 0, `${sign > 0 ? '批量完成' : '批量取消'}${k}：${s}`, expAmount * sign); 
+        Auth.grant(id, coinAmount * sign, starAmount * sign, `${sign > 0 ? '批量完成' : '批量取消'}${k}：${s}`, expAmount * sign); 
       });
     }
     
     Auth.saveRecords(all); renderRoster(); 
-    if (!isAllDone && expAmount > 0) toast('已全班打勾，并发放了经验奖励！');
+    if (!isAllDone && (expAmount > 0 || coinAmount > 0)) toast('已全班打勾，并发放了奖励！');
   },
   copyTodo() {                                             // 复制成文字，方便发给家长或同事
     const { d, k } = rState(), recs = Auth.records(), stu = students();
@@ -1042,23 +1044,24 @@ document.addEventListener('change', e => {                 // 勾选/取消勾�
   if (!c) return;
   const { d, k } = rState(), all = Auth.records(), key = rKey(d, k, c.dataset.subj), set = new Set(all[key] || []);
   
-  // 👇 1. 算出该给多少经验
-  let expAmount = 0;
-  if (k === '签到') expAmount = 20;
-  if (k === '默写' || k === '功课') expAmount = 30;
+  // 👇 1. 算出该给多少经验与金币
+  let expAmount = 0, coinAmount = 0;
+  if (k === '签到') { expAmount = 20; coinAmount = 10; }
+  if (k === '默写') { expAmount = 20; coinAmount = 50; }
+  if (k === '功课') { expAmount = 30; coinAmount = 20; }
 
-  // 👇 2. 根据打勾/取消，发正数或负数经验
+  // 👇 2. 根据打勾/取消，发正数或负数奖励
   if (c.checked) {
     set.add(c.dataset.sid);
-    if (expAmount > 0) {
-      Auth.grant(c.dataset.sid, 0, 0, `${k}：${c.dataset.subj}`, expAmount);
-      toast(`✅ 已打勾，学生获得 ${expAmount} 经验`);
+    if (expAmount > 0 || coinAmount > 0) {
+      Auth.grant(c.dataset.sid, coinAmount, k === '签到' ? 1 : 0, `${k}：${c.dataset.subj}`, expAmount);
+      toast(`✅ 已打勾，获得 ${coinAmount}金币和${expAmount}经验`);
     }
   } else {
     set.delete(c.dataset.sid);
-    if (expAmount > 0) {
-      Auth.grant(c.dataset.sid, 0, 0, `取消${k}：${c.dataset.subj}`, -expAmount);
-      toast(`↩️ 已取消，扣回 ${expAmount} 经验`);
+    if (expAmount > 0 || coinAmount > 0) {
+      Auth.grant(c.dataset.sid, -coinAmount, k === '签到' ? -1 : 0, `取消${k}：${c.dataset.subj}`, -expAmount);
+      toast(`↩️ 已取消，扣回 ${coinAmount}金币和${expAmount}经验`);
     }
   }
   
