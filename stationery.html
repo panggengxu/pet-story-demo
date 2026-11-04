@@ -148,10 +148,19 @@ async function renderData() {
     // 1. 渲染库存（和原来一样，不用改）
     const { data: items } = await Auth.sb.from('stationery_stock').select('*').order('id');
     if (items) {
+      // 👇 1. 先算出所有参与盲盒的总权重
+      const totalWeight = items.reduce((sum, it) => sum + (it.gacha_weight || 0), 0);
+  
       $('t-stock-rows').replaceChildren(...items.map(it => {
+        // 👇 2. 计算真实的百分比
+        let probText = '不参与';
+        if (it.gacha_weight > 0 && totalWeight > 0) {
+          probText = Number((it.gacha_weight / totalWeight * 100).toFixed(1)) + '%';
+        }
+
         return el('tr', {},
           el('td', {}, el('b', { textContent: `${it.icon || '🎁'} ${it.name}` })),
-          el('td', { textContent: it.gacha_weight > 0 ? `${it.gacha_weight}%` : '不参与' }),
+          el('td', { textContent: probText }), // 👈 使用计算好的概率
           el('td', { textContent: it.shop_price > 0 ? `${it.shop_price}🪙` : '不直售' }),
           el('td', {}, el('input', { 
             type: 'number', value: it.stock, min: 0, 
