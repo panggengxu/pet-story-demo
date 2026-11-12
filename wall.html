@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>留言墙监控中心 · Pets Story</title>
+<style>
+:root{--bg:#f4f7fe;--primary:#4318ff;--accent:#ffb800;--text:#2b3674;--muted:#a3aed0;--border:#e9edf7;--soft:#f8f9fc;--ok:#05cd99;--danger:#fde8e8;--danger-text:#c22}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,sans-serif}
+body{background:var(--bg);color:var(--text);padding:16px}
+.wrap{max-width:900px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:#fff;padding:14px 20px;border-radius:16px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,.03);position:sticky;top:10px;z-index:100}
+.brand{font-weight:bold;color:var(--primary);font-size:1.1rem}
+.card{background:#fff;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,.03)}
+h2{font-size:1.05rem;margin-bottom:16px;color:var(--text);border-bottom:2px solid var(--soft);padding-bottom:8px}
+
+/* 表单样式 */
+.form-row{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+select,textarea{padding:10px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:.9rem;width:100%;outline:none}
+select{width:200px;cursor:pointer}
+textarea{height:80px;resize:vertical}
+select:focus,textarea:focus{outline:3px solid var(--accent);outline-offset:1px}
+.b{background:var(--primary);color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.9rem;transition:0.2s;text-decoration:none;display:inline-block}
+.b:hover{opacity:0.9}
+.b.ghost{background:var(--soft);color:var(--text);border:1px solid var(--border)}
+.b.red{background:var(--danger);color:var(--danger-text)}
+
+/* 筛选栏 */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.filter-btn{background:var(--soft);border:1px solid var(--border);padding:6px 12px;border-radius:20px;font-size:.85rem;cursor:pointer;color:var(--text);transition:0.2s}
+.filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary);font-weight:bold}
+
+/* 留言列表 */
+.msg-item{display:flex;justify-content:space-between;align-items:flex-start;padding:15px;border-bottom:1px solid var(--border);gap:12px;transition:0.2s}
+.msg-item:last-child{border-bottom:none}
+.msg-item:hover{background:var(--soft);border-radius:10px}
+.msg-left{flex:1;min-width:0}
+.msg-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.tag{font-size:.7rem;padding:2px 8px;border-radius:6px;font-weight:bold}
+.tag.all{background:#eeeaff;color:var(--primary)}
+.tag.class{background:#e6faf5;color:var(--ok)}
+.tag.teacher{background:#fff7e6;color:#b26a00}
+.author{font-weight:bold;font-size:.9rem}
+.time{font-size:.75rem;color:var(--muted)}
+.msg-content{font-size:.95rem;line-height:1.5;color:var(--text);word-break:break-all}
+.msg-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.empty{color:var(--muted);padding:20px 0;text-align:center}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 18px;border-radius:10px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;z-index:999;max-width:90vw}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">💬 留言墙监控中心</div>
+    <div style="display:flex;gap:8px">
+      <a href="teacher.html" class="b ghost">返回主后台</a>
+      <button class="b" data-a="logout">退出</button>
+    </div>
+  </header>
+
+  <!-- 发布卡片 -->
+  <section class="card">
+    <h2>📢 发布新留言</h2>
+    <div class="form-row">
+      <select id="post-scope">
+        <option value="all">发送给：全服留言墙</option>
+        <!-- 班级选项会由 JS 动态生成 -->
+      </select>
+    </div>
+    <div class="form-row">
+      <textarea id="post-body" placeholder="写下你要对全中心或本班同学的鼓励/公告..." maxlength="200"></textarea>
+    </div>
+    <div style="text-align:right">
+      <button class="b" data-a="post">立即发布</button>
+    </div>
+  </section>
+
+  <!-- 管理卡片 -->
+  <section class="card">
+    <h2>🛡️ 留言审查与清理</h2>
+    
+    <!-- 筛选按钮 -->
+    <div class="filters" id="filter-area">
+      <!-- 筛选按钮由 JS 动态生成 -->
+    </div>
+
+    <!-- 留言列表 -->
+    <div id="wall-list">
+      <div class="empty">加载中...</div>
+    </div>
+  </section>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.100.1/dist/umd/supabase.js"></script>
+<script src="shared.js"></script>
+<script>
+const me = Auth.guard('teacher');
+if (!me) throw new Error('未登录');
+
+const $ = id => document.getElementById(id);
+const el = (t, p = {}, ...k) => { const n = Object.assign(document.createElement(t), p); n.append(...k); return n; };
+let tt; const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2200); };
+
+let currentFilter = 'all'; // 'all' = 全服留言墙
+
+// 渲染班级下拉框和筛选按钮
+function renderUI() {
+  const classes = Auth.classes();
+  const myUser = Auth.users().find(u => u.id === me.id);
+  
+  // 1. 渲染发布下拉框
+  const scopeSel = $('post-scope');
+  scopeSel.replaceChildren(new Option('发送给：全服留言墙', 'all'));
+  const myClasses = myUser.admin ? classes : classes.filter(c => (myUser.classIds || []).includes(c.id));
+  myClasses.forEach(c => scopeSel.append(new Option(`发送给：${c.name}`, c.id)));
+
+  // 2. 渲染筛选按钮
+  const filterArea = $('filter-area');
+  filterArea.replaceChildren();
+  
+  const makeBtn = (id, label) => {
+    const b = el('button', { className: 'filter-btn' + (currentFilter === id ? ' active' : ''), textContent: label });
+    b.onclick = () => { currentFilter = id; renderUI(); renderWall(); };
+    return b;
+  };
+
+  filterArea.append(makeBtn('all', '📢 全服留言墙'));
+  myClasses.forEach(c => filterArea.append(makeBtn(c.id, c.name)));
+}
+
+// 渲染留言列表
+function renderWall() {
+  const list = $('wall-list');
+  const allPosts = Auth.wall();
+  const classes = Auth.classes();
+
+  // 过滤逻辑：点全服只显示 classId 为 null 的，点班级只显示对应的
+  const posts = allPosts.filter(p => {
+    if (currentFilter === 'all') return p.classId === null; 
+    return p.classId === currentFilter; 
+  });
+
+  if (!posts.length) {
+    return list.replaceChildren(el('div', { className: 'empty', textContent: '这个范围下还没有留言。' }));
+  }
+
+  list.replaceChildren(...posts.map(p => {
+    const clsName = p.classId ? classes.find(c => c.id === p.classId)?.name || '未知班级' : '全服留言墙';
+    const isTeacher = p.role === 'teacher';
+    const timeStr = new Date(p.time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    return el('div', { className: 'msg-item', style: isTeacher ? 'background:#fffdf5' : '' },
+      el('div', { className: 'msg-left' },
+        el('div', { className: 'msg-meta' },
+          isTeacher ? el('span', { className: 'tag teacher', textContent: '【老师】' }) : '',
+          el('span', { className: 'tag ' + (p.classId ? 'class' : 'all'), textContent: clsName }),
+          el('span', { className: 'author', textContent: p.name }),
+          el('span', { className: 'time', textContent: timeStr })
+        ),
+        el('div', { className: 'msg-content', textContent: p.body })
+      ),
+      el('div', { className: 'msg-right' },
+        // 👇 直接绑定 onclick，保证 100% 能删掉
+        el('button', { 
+          className: 'b red', 
+          textContent: '删除', 
+          onclick: async () => {
+            if (!confirm('确定删除这条留言？')) return;
+            try {
+              await Auth.delPost(p.id);
+              await Auth.refresh();
+              renderWall();
+              toast('🗑️ 已删除');
+            } catch (e) {
+              toast('❌ 删除失败：' + e.message);
+            }
+          } 
+        })
+      )
+    );
+  }));
+}
+
+const ACTIONS = {
+  logout: Auth.logout,
+  async post() {
+    const scope = $('post-scope').value;
+    const body = $('post-body').value.trim();
+    if (!body) return toast('请先写点内容');
+    
+    try {
+      await Auth.postWall(body, scope === 'all' ? null : scope);
+      $('post-body').value = '';
+      await Auth.refresh();
+      renderWall();
+      toast('✅ 发布成功');
+    } catch (e) {
+      toast('❌ 发布失败：' + e.message);
+    }
+  }
+};
+
+// 全局按钮点击（发布、退出）
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-a]');
+  if (t && !t.disabled) ACTIONS[t.dataset.a]?.(t.dataset);
+});
+
+// 初始化
+Auth.ready.then(() => {
+  renderUI();
+  renderWall();
+});
+</script>
+</body>
+</html>

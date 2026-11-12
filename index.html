@@ -27,9 +27,28 @@ body{background:var(--bg);color:var(--text);padding:16px}
 header{display:flex;justify-content:space-between;align-items:center;background:var(--card);padding:14px 20px;border-radius:16px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,.03);flex-wrap:wrap;gap:10px}
 .brand{font-weight:bold;color:var(--primary)}
 .tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
-.tab-btn{background:var(--bg);border:none;padding:8px 14px;border-radius:10px;font-weight:600;cursor:pointer;color:var(--text);font-size:.85rem;white-space:nowrap}
+.tab-btn{background:var(--bg);border:none;padding:8px 14px;border-radius:10px;font-weight:600;cursor:pointer;color:var(--text);font-size:.85rem;white-space:nowrap;transition:0.2s}
 .tab-btn[aria-selected=true]{background:var(--primary);color:#fff}
 button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* 👇 新增：手机端 Tab 自动换行排版 👇 */
+@media (max-width: 768px) {
+  header { flex-direction: column; align-items: flex-start; padding: 12px; }
+  .brand { width: 100%; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .tabs { 
+    display: grid; 
+    grid-template-columns: repeat(4, 1fr); /* 一行放 4 个，自动换行 */
+    width: 100%; 
+    gap: 8px; 
+    overflow-x: visible; /* 彻底关掉横向滑动 */
+  }
+  .tab-btn { 
+    padding: 8px 0; 
+    font-size: 0.75rem; 
+    display: flex; justify-content: center; align-items: center;
+    white-space: normal; text-align: center;
+  }
+}
 .section-view{display:none}.section-view.active{display:block}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:768px){.grid-2{grid-template-columns:1fr}}
@@ -216,12 +235,12 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
     </div>
     <div class="tabs" role="tablist">
       <button class="tab-btn" role="tab" data-action="tab" data-id="home" aria-selected="true">🏠 首页</button>
-      <button class="tab-btn" role="tab" data-action="tab" data-id="warehouse" aria-selected="false">🏠 宠物仓库</button>
-      <button class="tab-btn" role="tab" data-action="tab" data-id="shop" aria-selected="false">🛒 宠物商店与抽奖</button>
-      <button class="tab-btn" role="tab" data-action="tab" data-id="music" aria-selected="false">🎵 音乐盒</button>
+      <button class="tab-btn" role="tab" data-action="tab" data-id="warehouse" aria-selected="false">🏠 仓库</button>
+      <button class="tab-btn" role="tab" data-action="tab" data-id="shop" aria-selected="false">🛒 商店</button>
+      <button class="tab-btn" role="tab" data-action="tab" data-id="music" aria-selected="false">🎵 音乐</button>
       <button class="tab-btn" role="tab" data-action="tab" data-id="ranking" aria-selected="false">🏆 战力榜</button>
       <button class="tab-btn" role="tab" data-action="tab" data-id="hof" aria-selected="false">🏆 封神榜</button>
-      <button class="tab-btn" role="tab" data-action="tab" data-id="social" aria-selected="false">💬 留言与好友</button>
+      <button class="tab-btn" role="tab" data-action="tab" data-id="social" aria-selected="false">💬 社交</button>
     </div>
   </header>
 
@@ -504,6 +523,14 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
         </div>
         <textarea id="msg-input" maxlength="200" aria-label="留言内容" placeholder="写下你的学习心得，或给同学的鼓励..."></textarea>
         <button class="btn-action" data-action="post">发布留言</button>
+        <!-- 👇 新增：留言墙筛选按钮 👇 -->
+        <div style="margin-top:16px; display:flex; gap:8px;">
+          <button class="tab-btn" data-action="filterWall" data-scope="all" aria-selected="true">🌐 全服留言</button>
+          <button class="tab-btn" data-action="filterWall" data-scope="class" aria-selected="false">👥 同班留言</button>
+          <button class="tab-btn" data-action="filterWall" data-scope="mixed" aria-selected="false">📋 全部</button>
+        </div>
+        <!-- 👆 新增结束 👆 -->
+
         <div id="msg-list" style="margin-top:12px;font-size:.85rem;max-height:460px;overflow-y:auto"></div>
       </div>
       <div class="card">
@@ -1318,18 +1345,45 @@ function renderMusic() {
     });
   });
 }
-let wallShown = 15;                                        // 留言墙默认只显示最新 15 条，点“查看更多”再多看
-function renderMessages() {                                // 留言墙：同班和全部班级的留言（纯文本显示，防 XSS）
-  const box = $('msg-list'), uid = Auth.users().find(u => u.id === me.id)?.uid; box.replaceChildren();
-  const all = Auth.wall(), posts = all.slice(0, wallShown);
-  if (!posts.length) return box.append(el('div', { className: 'hint', textContent: '还没有留言，来写第一条吧！' }));
+let wallShown = 15; 
+let currentStudentWallFilter = 'all'; // 👈 默认显示全服留言
+
+function renderMessages() { 
+  const box = $('msg-list'), uid = Auth.users().find(u => u.id === me.id)?.uid; 
+  box.replaceChildren();
+  
+  // 👇 1. 更新顶部按钮的高亮状态
+  document.querySelectorAll('[data-action="filterWall"]').forEach(b => 
+    b.setAttribute('aria-selected', b.dataset.scope === currentStudentWallFilter)
+  );
+
+  const all = Auth.wall();
+  
+  // 👇 2. 根据当前的筛选状态过滤数据
+  const filtered = all.filter(p => {
+    if (currentStudentWallFilter === 'all') return p.classId === null; // 只显示全服
+    if (currentStudentWallFilter === 'class') return p.classId !== null; // 只显示同班
+    return true; // mixed 显示全部
+  });
+
+  const posts = filtered.slice(0, wallShown);
+  
+  if (!posts.length) {
+    return box.append(el('div', { className: 'hint', style: 'text-align:center;padding:10px', textContent: '这个范围下还没有留言，来写第一条吧！' }));
+  }
+
   posts.forEach(p => box.append(el('div', { className: 'msg-item' },
     el('div', { style: 'display:flex;justify-content:space-between;gap:6px;align-items:center' },
-      el('span', {}, el('b', { textContent: `${p.role === 'teacher' ? '【老师】' : ''}${p.name}` }),
-        el('span', { className: 'hint', style: 'font-size:.75rem', textContent: ` ${p.classId ? '同班' : '🌐 全部班级'} ${new Date(p.time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` })),
+      el('span', {}, 
+        el('b', { textContent: `${p.role === 'teacher' ? '【老师】' : ''}${p.name}` }),
+        el('span', { className: 'hint', style: 'font-size:.75rem', textContent: ` ${p.classId ? '同班' : '🌐 全服'} ${new Date(p.time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` })
+      ),
       p.authorId === uid ? btn('删除', 'delPost', { id: p.id }, 'unequip') : ''),
     el('div', { textContent: p.body, style: 'margin-top:2px;overflow-wrap:anywhere' }))));
-  if (all.length > wallShown) box.append(btn(`查看更多（还有 ${all.length - wallShown} 条）`, 'moreWall', {}, 'btn-action btn-block'));
+    
+  if (filtered.length > wallShown) {
+    box.append(btn(`查看更多（还有 ${filtered.length - wallShown} 条）`, 'moreWall', {}, 'btn-action btn-block'));
+  }
 }
 
 // ===== 行为 =====
@@ -2336,6 +2390,12 @@ toWarehouse({ id }) {
     if (state.petLevel < 1) return toast('请先孵化宠物');
     if (state.petLevel >= 3) return toast('已经是最高等级了');
     state.petLevel++; render(); toast('⬆️ 已升到 Lv.' + state.petLevel);
+  },
+    // 👇 新增：切换留言墙视角
+  filterWall({ scope }) { 
+    currentStudentWallFilter = scope; 
+    wallShown = 15; // 切换时重置显示条数
+    renderMessages(); 
   },
   moreWall() { wallShown += 15; renderMessages(); },
   async post() {
