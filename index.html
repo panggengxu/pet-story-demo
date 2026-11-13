@@ -254,8 +254,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
             <div class="stat">🪙 金币: <strong id="coins">0</strong></div>
             <div class="stat">⭐ 星星: <strong id="stars">0</strong></div>
           </div>
-          <button id="teacher-daily-btn" class="btn-action btn-gold btn-block" style="display:none; margin-top:10px;" data-action="claimTeacherDaily">👩‍🏫 领取教师专属每日津贴（5000金币 + 500经验）</button>
-        </div>
+          <button id="teacher-daily-btn" class="btn-action btn-gold btn-block" style="margin-top:10px; display:none;" data-action="claimTeacherDaily">👩‍🏫 领取教师专属每日津贴（5000金币 + 500经验）</button>        </div>
         </div>
         <div class="card">
           <div class="card-title">NOTICE BOARD</div>
@@ -2400,7 +2399,32 @@ toWarehouse({ id }) {
     if (state.petLevel >= 3) return toast('已经是最高等级了');
     state.petLevel++; render(); toast('⬆️ 已升到 Lv.' + state.petLevel);
   },
-    // 👇 新增：切换留言墙视角
+  // 👇 新增：领取教师每日津贴
+  claimTeacherDaily() {
+     if (!me.id.startsWith('teacher') && !me.id.startsWith('test')) {
+       return toast('❌ 只有老师或测试账号才能领取专属津贴哦！');
+     }
+     const todayStr = today();
+     const lastClaim = localStorage.getItem(`teacher_daily_claimed_${me.id}`);     
+     if (lastClaim === todayStr) {
+       return toast('⏳ 今天已经领过啦，明天再来吧！');
+     }
+     
+     state.coins = (state.coins || 0) + 5000;
+     state.petExp = (state.petExp || 0) + 500;
+     localStorage.setItem(`teacher_daily_claimed_${me.id}`, todayStr);     
+     save(); pushSave(true); render();
+     
+     // 👇 新增：领完之后立刻把按钮变灰、改文字
+    const btn = $('teacher-daily-btn');
+    btn.disabled = true;
+    btn.style.background = '#ccc'; // 灰色
+    btn.style.color = '#666'; // 深灰字
+    btn.style.cursor = 'not-allowed';
+    btn.textContent = '✅ 今日津贴已领取（明天再来）';
+    
+    toast('🎉 领取成功！获得 5000 金币 + 500 经验');
+  },    // 👇 新增：切换留言墙视角
   filterWall({ scope }) { 
     currentStudentWallFilter = scope; 
     wallShown = 15; // 切换时重置显示条数
@@ -2981,7 +3005,19 @@ async function poll() {                                    // 同步老师新发
   try { await Auth.refresh(); await claim(); render(); } catch (e) { /* 网络不好时下次再试 */ }
 }
 Auth.ready.then(async () => {
-  // 1. 绑定音量调节滑块
+  // 👇 新增：如果是老师或测试号，显示每日工资按钮
+  if (me.id.startsWith('teacher') || me.id.startsWith('test')) {
+    const btn = $('teacher-daily-btn');
+    btn.style.display = 'block';
+    
+    // 👇 新增：如果今天已经领过，直接显示已领取状态
+    if (localStorage.getItem(`teacher_daily_claimed_${me.id}`) === today()) {      btn.disabled = true;
+      btn.style.background = '#ccc';
+      btn.style.color = '#666';
+      btn.style.cursor = 'not-allowed';
+      btn.textContent = '✅ 今日津贴已领取（明天再来）';
+    }
+  }  // 1. 绑定音量调节滑块
   $('bgm-volume').addEventListener('input', e => {
     player.volume = e.target.value;
     if (player.volume > 0 && player.muted) {
