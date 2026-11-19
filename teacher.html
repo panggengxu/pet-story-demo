@@ -985,10 +985,15 @@ document.addEventListener('click', e => {
   }
 });
 
-// 👇 新增：为了防止 fixed 菜单在滚动时“飘”在屏幕中间，一旦滚动就自动收起菜单
+// 👇 修复版：滚动时，只关闭“更多”下拉菜单，保留老师的大折叠面板
 document.addEventListener('scroll', () => {
-  document.querySelectorAll('details[open]').forEach(d => d.removeAttribute('open'));
-}, true); // 这里用 true 捕获滚动，不管是表格滚动还是整页滚动都能监听到
+  document.querySelectorAll('details[open]').forEach(d => {
+    // 如果这个 details 里面包含 .dropdown-menu（说明是操作列的那个小菜单），才把它关掉
+    if (d.querySelector('.dropdown-menu')) {
+      d.removeAttribute('open');
+    }
+  });
+}, true);
 window.addEventListener('storage', render);               // 学生在别的标签页打卡时，这里自动刷新
 
 $('me').textContent = me.name;
